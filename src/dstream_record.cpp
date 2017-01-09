@@ -131,14 +131,18 @@ class dstream_writer {
 
 int main(int argc, char *argv[])
 {
-  if (argc < 2)
+  const char *root_url = "tcp://localhost";
+
+  if (argc > 2)
     return 1;
+  if (argc == 2)
+    root_url = argv[1];
 
   std::map<uint16_t, dstream_key> rpc_to_stream;
   std::map<dstream_key, uint16_t> stream_to_rpc;
   std::map<dstream_key, dstream_writer> streams;
 
-  int fd = tlopen(argv[1], O_CLOEXEC, NULL);
+  int fd = tlopen(root_url, O_CLOEXEC, NULL);
 
   for (;;) {
     tl_packet pkt;

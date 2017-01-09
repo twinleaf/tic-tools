@@ -1,10 +1,10 @@
-// Copyright: 2016 Twinleaf LLC
+// Copyright: 2016-2017 Twinleaf LLC
 // Author: gilberto@tersatech.com
 // License: Proprietary
 
 // Small program that sends an RPC request and interprets the returned value.
 // Example:
-// rpc_req serial://ttyUSB0:115200/ period u32:100
+// rpc_req -s serial://ttyUSB0:115200/ period u32:100
 
 #include <tio/rpc.h>
 #include <tio/io.h>
@@ -15,29 +15,57 @@
 #include <errno.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <unistd.h>
+#include <sysexits.h>
+
+int usage(FILE *out, const char *program, const char *error)
+{
+  if (error)
+    fprintf(out, "%s\n", error);
+  fprintf(out, "Usage: %s [-r root URL] [-l sensor path] <rpc name> "
+               "[arg-type:value]\n", program);
+  fprintf(out, "  -r   Specify the root of the sensor tree to which issue "
+               "       the RPC request. Defaults to tcp://localhost.\n");
+  fprintf(out, "  -s   Specify the sensor path relative to the root (/).\n");
+  fprintf(out, " arg-type   Can be u8/u16/u32/u64 i8/i16/i32/i64 f32/f64 \n"
+               "            or s. No type will imply type s (string).\n");
+  return EX_USAGE;
+}
 
 int main(int argc, char *argv[])
 {
-  if ((argc < 3) || (argc > 4)) {
-    fprintf(stderr, "Usage: %s <sensor URL> <rpc name> "
-            "[arg type:value]\n", argv[0]);
-    return 1;
+  const char *root_url = "tcp://localhost";
+  const char *sensor_path = "/";
+
+  for (int opt = -1; (opt = getopt(argc, argv, "r:s:")) != -1; ) {
+    if (opt == 'r') {
+      root_url = optarg;
+    } else if (opt == 's') {
+      sensor_path = optarg;
+    } else {
+      return usage(stderr, argv[0], "Invalid command line option");
+    }
   }
 
+  int nargs = argc - optind;
+  if ((nargs < 1) || (nargs > 2))
+    return usage(stderr, argv[0], "Invalid parameters");
+
   size_t arg_size = 0;
-  void *arg = NULL;
+  const void *arg = NULL;
   uint8_t arg_buf[8];
 
   // parse rpc argument
 
-  if (argc >= 4) {
-    if ((strncmp(argv[3], "u8:", 2) == 0) ||
-        (strncmp(argv[3], "u16:", 2) == 0) ||
-        (strncmp(argv[3], "u32:", 2) == 0) ||
-        (strncmp(argv[3], "u64:", 2) == 0)) {
+  if (nargs == 2) {
+    const char *rpc_arg = argv[optind+1];
+    if ((strncmp(rpc_arg, "u8:", 2) == 0) ||
+        (strncmp(rpc_arg, "u16:", 2) == 0) ||
+        (strncmp(rpc_arg, "u32:", 2) == 0) ||
+        (strncmp(rpc_arg, "u64:", 2) == 0)) {
       // unsigned integer
       char *end;
-      unsigned long val = strtoul(argv[3] + ((argv[3][1] == '8') ? 3 : 4),
+      unsigned long val = strtoul(rpc_arg + ((rpc_arg[1] == '8') ? 3 : 4),
                                   &end, 0);
       if (*end) {
         fprintf(stderr, "argument parse error\n");
@@ -45,42 +73,42 @@ int main(int argc, char *argv[])
       }
       *(unsigned long*)arg_buf = val;
       arg = arg_buf;
-      switch (argv[3][1]) {
+      switch (rpc_arg[1]) {
        case '8': arg_size = 1; break;
        case '1': arg_size = 2; break;
        case '3': arg_size = 4; break;
        case '6': arg_size = 8; break;
       }
-    } else if ((strncmp(argv[3], "i8:", 2) == 0) ||
-               (strncmp(argv[3], "i16:", 2) == 0) ||
-               (strncmp(argv[3], "i32:", 2) == 0) ||
-               (strncmp(argv[3], "i64:", 2) == 0)) {
+    } else if ((strncmp(rpc_arg, "i8:", 2) == 0) ||
+               (strncmp(rpc_arg, "i16:", 2) == 0) ||
+               (strncmp(rpc_arg, "i32:", 2) == 0) ||
+               (strncmp(rpc_arg, "i64:", 2) == 0)) {
       // signed integer
       char *end;
-      long val = strtol(argv[3] + ((argv[3][1] == '8') ? 3 : 4), &end, 0);
+      long val = strtol(rpc_arg + ((rpc_arg[1] == '8') ? 3 : 4), &end, 0);
       if (*end) {
         fprintf(stderr, "argument parse error\n");
         return 1;
       }
       *(long*)arg_buf = val;
       arg = arg_buf;
-      switch (argv[3][1]) {
+      switch (rpc_arg[1]) {
        case '8': arg_size = 1; break;
        case '1': arg_size = 2; break;
        case '3': arg_size = 4; break;
        case '6': arg_size = 8; break;
       }
-    } else if ((strncmp(argv[3], "f32:", 2) == 0) ||
-               (strncmp(argv[3], "f64:", 2) == 0)) {
+    } else if ((strncmp(rpc_arg, "f32:", 2) == 0) ||
+               (strncmp(rpc_arg, "f64:", 2) == 0)) {
       // floating point
       char *end;
-      double val = strtod(argv[3] + 4, &end);
+      double val = strtod(rpc_arg + 4, &end);
       if (*end) {
         fprintf(stderr, "argument parse error\n");
         return 1;
       }
       arg = arg_buf;
-      switch (argv[3][1]) {
+      switch (rpc_arg[1]) {
        case '3':
         *(float*)arg_buf = val;
         arg_size = 4;
@@ -92,24 +120,32 @@ int main(int argc, char *argv[])
       }
     } else {
       // string argument
-      arg_size = strlen(argv[3]);
-      if (strncmp(argv[3], "s:", 2) == 0) {
+      arg_size = strlen(rpc_arg);
+      if (strncmp(rpc_arg, "s:", 2) == 0) {
         arg_size -= 2;
-        arg = argv[3] + 2;
+        arg = rpc_arg + 2;
       } else {
-        arg = argv[3];
+        arg = rpc_arg;
       }
     }
   }
 
-  int fd = tlopen(argv[1], 0, NULL);
+  int fd = tlopen(root_url, 0, NULL);
   if (fd < 0) {
-    fprintf(stderr, "Failed to open %s: %s\n", argv[1], strerror(errno));
+    fprintf(stderr, "Failed to open %s: %s\n", root_url, strerror(errno));
+    return 1;
+  }
+
+  uint8_t routing[TL_PACKET_MAX_ROUTING_SIZE];
+  int routing_len = tl_parse_routing(routing, sensor_path);
+  if (routing_len < 0) {
+    fprintf(stderr, "Failed parse routing '%s'\n", sensor_path);
     return 1;
   }
 
   tl_rpc_reply_packet rep;
-  int ret = tl_simple_rpc(fd, argv[2], 0, arg, arg_size, &rep, NULL);
+  int ret = tl_simple_rpc(fd, argv[optind], 0, arg, arg_size, &rep,
+                          routing, routing_len, NULL);
   if (ret < 0)
     fprintf(stderr, "RPC failed: %s\n", strerror(errno));
   if (ret > 0)
