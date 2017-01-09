@@ -1,4 +1,4 @@
-// Copyright: 2016 Twinleaf LLC
+// Copyright: 2016-2017 Twinleaf LLC
 // Author: gilberto@tersatech.com
 // License: Proprietary
 
@@ -309,25 +309,24 @@ int hub_packet(size_t ps, tl_packet *packet)
     size_t method_size = tl_rpc_request_method_size(req);
 #define METHOD(x)                                                       \
     ((strlen(x) == method_size) && (memcmp(x, req->payload, method_size) == 0))
-    if (METHOD("mcu.desc")) {
+    if (METHOD("dev.desc")) {
       tl_rpc_reply_packet *rep = tl_rpc_make_reply(req);
       size_t len = strlen(hub_name);
       if (len > TL_RPC_REPLY_MAX_PAYLOAD_SIZE)
         len = TL_RPC_REPLY_MAX_PAYLOAD_SIZE;
       memcpy(rep->payload, hub_name, len);
       rep->hdr.payload_size += len;
-    } else if (METHOD("mcu.id")) {
+    } else if (METHOD("dev.proc.id")) {
       tl_rpc_reply_packet *rep = tl_rpc_make_reply(req);
       size_t len = strlen(hub_id);
       if (len > TL_RPC_REPLY_MAX_PAYLOAD_SIZE)
         len = TL_RPC_REPLY_MAX_PAYLOAD_SIZE;
       memcpy(rep->payload, hub_id, len);
       rep->hdr.payload_size += len;
-    } else if (METHOD("port.enum")) {
+    } else if (METHOD("dev.ports")) {
       tl_rpc_reply_packet *rep = tl_rpc_make_reply(req);
-      for (size_t i = 0; i < n_sensors; i++)
-        rep->payload[i] = i + 1;
-      rep->hdr.payload_size += n_sensors;
+      *(uint32_t*)&rep->payload[0] = n_sensors;
+      rep->hdr.payload_size += sizeof(uint32_t);
     } else {
 #undef METHOD
       tl_rpc_make_error(req, TL_RPC_ERROR_NOTFOUND);
@@ -493,6 +492,7 @@ int client_data(size_t ps, tl_packet *packet)
 // Return 0 on success, -1 on error
 int handle_tlio(size_t ps)
 {
+  errno = 0;
   if (poll_array[ps].revents & POLLERR)
     return ERROR_LOCAL;
 

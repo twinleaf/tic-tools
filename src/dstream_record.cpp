@@ -1,4 +1,4 @@
-// Copyright: 2016 Twinleaf LLC
+// Copyright: 2016-2017 Twinleaf LLC
 // Author: gilberto@tersatech.com
 // License: Proprietary
 
@@ -168,6 +168,10 @@ int main(int argc, char *argv[])
                                    sizeof(stream_id)) != 0) {
           return 1;
         }
+        memcpy(tl_packet_routing_data(&req.hdr),
+               tl_packet_routing_data(&pkt.hdr),
+               pkt.hdr.routing_size);
+        req.hdr.routing_size = pkt.hdr.routing_size;
         if (tlsend(fd, &req) != 0) {
           return 1;
         }
@@ -247,7 +251,7 @@ void dstream_writer::process_desc(const tl_data_stream_desc_header *desc_,
     if (name.length() > 0)
       ss << "." << name;
     ss << "." << int(tmp.restart_id);
-    ss << "." << time(NULL);
+    ss << "." << tmp.start_timestamp/1000000000;
 
     out.open(ss.str());
 
