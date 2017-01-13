@@ -35,12 +35,12 @@ int main(int argc, char *argv[])
 
 #if USE_GPS
   val = 1;
-  printf("Enabling GPS timebase...\n");
+  printf("Locking to GPS timebase...\n");
 #else
   val = 0;
-  printf("Enabling local timebase...\n");
+  printf("Using  local timebase...\n");
 #endif
-  if (tl_simple_rpc(fd, "use_gps_timebase", 0, &val, 1, &rep,
+  if (tl_simple_rpc(fd, "lock_to_gps", 0, &val, 1, &rep,
                     NULL, 0, NULL) != 0)
     return 1;
 
@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
   // Synchronize time to GPS
   printf("Syncing TIM's time to GPS...\n");
   val = 1;
-  if (tl_simple_rpc(fd, "sync_time_to_gps", 0, &val, 1, &rep,
+  if (tl_simple_rpc(fd, "set_time_to_gps", 0, &val, 1, &rep,
                     NULL, 0, NULL) != 0)
     return 1;
 
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 
   printf("Waiting for GPS lock...\n");
   for (uint8_t lock = 0;;) {
-    if (tl_simple_rpc_fixed_size(fd, "gps_lock", 0, NULL, 0,
+    if (tl_simple_rpc_fixed_size(fd, "gps_valid", 0, NULL, 0,
                                  &lock, sizeof(lock), NULL, 0, NULL) != 0)
       return 1;
     if (lock)
@@ -64,7 +64,6 @@ int main(int argc, char *argv[])
     else
       usleep(1000000);
   }
-
 #endif
 
   // Set system times for individual VM4 boards
