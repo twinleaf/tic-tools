@@ -5,6 +5,9 @@
 // Simple program to start capturing synchronized data from VM4 boards
 // connected to a TIM R2 board.
 
+
+// Usage: ./tim_acq 50 tcp://localhost 0 1 2
+
 #include <tio/io.h>
 #include <tio/rpc.h>
 #include <stdio.h>
@@ -84,7 +87,7 @@ int main(int argc, char *argv[])
                       routing, routing_len, NULL) != 0)
       return 1;
 
-    printf("Set VM4:%s time to %lu\n", argv[i], tim_time);
+    printf("Set VM4:%s time to %llu\n", argv[i], tim_time);
 
     if (tl_simple_rpc(fd, "period", 0, &period, sizeof(period), &rep,
                       routing, routing_len, NULL) != 0)
