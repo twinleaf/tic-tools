@@ -102,11 +102,13 @@ rpc_remap *client_list;
 rpc_remap orphan_list;
 rpc_remap timeout_list; // circular list of timeouts
 
+int verbose = 0;
+
 int usage(FILE *out, const char *program, const char *error)
 {
   if (error)
     fprintf(out, "%s\n", error);
-  fprintf(out, "Usage: %s [-p port] [-f] [-c max_clients] [-r max_rpc] "
+  fprintf(out, "Usage: %s [-p port] [-f] [-c max_clients] [-r max_rpc] [-v] "
           "[-h [-i hub_id]] sensor_url [sensor_url ...]\n", program);
   fprintf(out, "  -p port   TPC listen port. default 7855\n");
   fprintf(out, "  -f        client forward mode\n");
@@ -116,6 +118,7 @@ int usage(FILE *out, const char *program, const char *error)
           "default 8\n");
   fprintf(out, "  -h        hub sensor mode\n");
   fprintf(out, "  -i id     id of the hub\n");
+  fprintf(out, "  -v        verbose logging\n");
   return EX_USAGE;
 }
 
@@ -148,6 +151,24 @@ void logmsg(const char *fmt, ...)
   vprintf(fmt, ap);
   va_end(ap);
   putchar('\n');
+}
+
+void logmsgverbose(const char *fmt, ...)
+{
+  if (verbose) {
+    time_t now = time(NULL);
+    struct tm tm;
+    localtime_r(&now, &tm);
+    char timebuf[128];
+    if (strftime(timebuf, sizeof(timebuf), "%F %T", &tm) == 0)
+      timebuf[0] = '\0';
+    printf("%s  ", timebuf);
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    putchar('\n');
+  }
 }
 
 void io_log(int fd, const char *message)
@@ -256,7 +277,7 @@ void disconnect_client(size_t ps)
 {
   // close the descriptor
   tlclose(poll_array[ps].fd);
-  logmsg("Disconnected client #%d", poll_array[ps].fd);
+  logmsgverbose("Disconnected client #%d", poll_array[ps].fd);
   poll_array[ps].fd = -1;
   // invalidate all of the client's RPCs in shared mode
   if (client_mode == CLIENT_MODE_SHARED) {
@@ -446,7 +467,7 @@ int client_data(size_t ps, tl_packet *packet)
       }
     }
 
-    logmsg("Remapping client #%d rpc %u to %u",
+    logmsgverbose("Remapping client #%d rpc %u to %u",
            poll_array[ps].fd, req->req.id, remap->id);
     remap->orig_id = req->req.id;
     req->req.id = remap->id;
@@ -514,7 +535,7 @@ int handle_tlio(size_t ps)
         if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
           break;
         if (errno == 0)
-          logmsg("Detected client #%d disconnect", poll_array[ps].fd);
+          logmsgverbose("Detected client #%d disconnect", poll_array[ps].fd);
         return ERROR_LOCAL;
       }
 
@@ -582,7 +603,7 @@ int client_connection(size_t ps)
       init_remap_struct(&client_list[n_descriptors], NULL, NULL);
     n_descriptors++;
 
-    logmsg("Accepted client #%d: %s:%s", tlfd, host, port);
+    logmsgverbose("Accepted client #%d: %s:%s", tlfd, host, port);
   }
 }
 
@@ -591,7 +612,7 @@ int main(int argc, char *argv[])
   size_t max_clients = 4;
   errno = 0;
 
-  for (int opt = -1; (opt = getopt(argc, argv, "fhp:c:r:i:")) != -1; ) {
+  for (int opt = -1; (opt = getopt(argc, argv, "fhp:c:r:i:v")) != -1; ) {
     if (opt == 'f') {
       client_mode = CLIENT_MODE_FORWARD;
     } else if (opt == 'h') {
@@ -609,6 +630,8 @@ int main(int argc, char *argv[])
     } else if (opt == 'i') {
       strncpy(hub_id, optarg, sizeof(hub_id) - 1);
       hub_id[sizeof(hub_id) - 1] = '\0';
+    } else if (opt == 'v') {
+      verbose = 1;
     } else {
       return usage(stderr, argv[0], "Invalid command line option");
     }
