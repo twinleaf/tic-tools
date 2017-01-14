@@ -174,7 +174,7 @@ void logmsgverbose(const char *fmt, ...)
 void io_log(int fd, const char *message)
 {
   // Send messages from the IO layer to log
-  logmsg("IO fd #%d message: %s", fd, message);
+  logmsgverbose("IO fd #%d message: %s", fd, message);
 }
 
 void init_remap_struct(rpc_remap *remap, rpc_remap *prev, rpc_remap *next)
