@@ -845,7 +845,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  logmsg("Attempting clean termination of I/O descriptors");
+  logmsgverbose("Attempting clean termination of I/O descriptors");
 
   // Give it about a second.
   for (int n = 0; n < 20; n++, usleep(50000)) {
