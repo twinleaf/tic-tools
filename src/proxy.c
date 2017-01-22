@@ -413,7 +413,7 @@ int sensor_data(size_t ps, tl_packet *packet)
       strcpy(path, "<INVALID PATH>");
     size_t len = tl_log_packet_message_size(logp);
     char fmt[128];
-    snprintf(fmt, sizeof(fmt), "Log (%%s) from sensor '%%s': %%.%zds", len);
+    snprintf(fmt, sizeof(fmt), "%%s %%s: %%.%zds", len);
     const char *type = "UNKNOWN";
     switch(logp->log.level) {
      case TL_LOG_CRITICAL: type = "CRITICAL"; break;
@@ -422,7 +422,7 @@ int sensor_data(size_t ps, tl_packet *packet)
      case TL_LOG_INFO: type = "INFO"; break;
      case TL_LOG_DEBUG: type = "DEBUG"; break;
     }
-    logmsg(fmt, type, path, logp->message);
+    logmsg(fmt, path, type, logp->message);
   }
 
   for (size_t i = client_start; i < client_end; i++) {
