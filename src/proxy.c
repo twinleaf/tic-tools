@@ -110,7 +110,7 @@ int usage(FILE *out, const char *program, const char *error)
     fprintf(out, "%s\n", error);
   fprintf(out, "Usage: %s [-p port] [-f] [-c max_clients] [-r max_rpc] [-v] "
           "[-h [-i hub_id]] sensor_url [sensor_url ...]\n", program);
-  fprintf(out, "  -p port   TPC listen port. default 7855\n");
+  fprintf(out, "  -p port   TCP listen port. default 7855\n");
   fprintf(out, "  -f        client forward mode\n");
   fprintf(out, "  -c max    max simultaneous clients in shared mode, "
           "default 4\n");
