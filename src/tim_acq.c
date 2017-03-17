@@ -17,6 +17,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #define USE_GPS 1
 
@@ -87,7 +88,7 @@ int main(int argc, char *argv[])
                       routing, routing_len, NULL) != 0)
       return 1;
 
-    printf("Set VM4:%s time to %llu\n", argv[i], tim_time);
+    printf("Set VM4:%s time to %"PRIu64"\n", argv[i], tim_time);
 
     if (tl_simple_rpc(fd, "period", 0, &period, sizeof(period), &rep,
                       routing, routing_len, NULL) != 0)
