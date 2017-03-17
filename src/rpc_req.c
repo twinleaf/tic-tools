@@ -22,7 +22,7 @@ int usage(FILE *out, const char *program, const char *error)
 {
   if (error)
     fprintf(out, "%s\n", error);
-  fprintf(out, "Usage: %s [-r root URL] [-l sensor path] <rpc name> "
+  fprintf(out, "Usage: %s [-r root URL] [-s sensor path] <rpc name> "
                "[arg-type:value]\n", program);
   fprintf(out, "  -r   Specify the root of the sensor tree to which issue "
                "       the RPC request. Defaults to tcp://localhost.\n");
