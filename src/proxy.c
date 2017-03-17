@@ -103,13 +103,15 @@ rpc_remap orphan_list;
 rpc_remap timeout_list; // circular list of timeouts
 
 int verbose = 0;
+const char *timefmt = "%F %T";
 
 int usage(FILE *out, const char *program, const char *error)
 {
   if (error)
     fprintf(out, "%s\n", error);
   fprintf(out, "Usage: %s [-p port] [-f] [-c max_clients] [-r max_rpc] [-v] "
-          "[-h [-i hub_id]] sensor_url [sensor_url ...]\n", program);
+          "[-h [-i hub_id]] [-t timefmt] sensor_url [sensor_url ...]\n",
+          program);
   fprintf(out, "  -p port   TCP listen port. default 7855\n");
   fprintf(out, "  -f        client forward mode\n");
   fprintf(out, "  -c max    max simultaneous clients in shared mode, "
@@ -119,6 +121,8 @@ int usage(FILE *out, const char *program, const char *error)
   fprintf(out, "  -h        hub sensor mode\n");
   fprintf(out, "  -i id     id of the hub\n");
   fprintf(out, "  -v        verbose logging\n");
+  fprintf(out, "  -t fmt    timestamp format (default \"%%F %%T\", "
+          "see man strftime)\n");
   return EX_USAGE;
 }
 
@@ -137,13 +141,14 @@ int error(const char *fmt, ...)
   return EXIT_FAILURE;
 }
 
+// Log a message to terminal, prefixed with a timestamp
 void logmsg(const char *fmt, ...)
 {
   time_t now = time(NULL);
   struct tm tm;
   localtime_r(&now, &tm);
   char timebuf[128];
-  if (strftime(timebuf, sizeof(timebuf), "%F %T", &tm) == 0)
+  if (strftime(timebuf, sizeof(timebuf), timefmt, &tm) == 0)
     timebuf[0] = '\0';
   printf("%s  ", timebuf);
   va_list ap;
@@ -153,28 +158,35 @@ void logmsg(const char *fmt, ...)
   putchar('\n');
 }
 
-void logmsgverbose(const char *fmt, ...)
-{
-  if (verbose) {
-    time_t now = time(NULL);
-    struct tm tm;
-    localtime_r(&now, &tm);
-    char timebuf[128];
-    if (strftime(timebuf, sizeof(timebuf), "%F %T", &tm) == 0)
-      timebuf[0] = '\0';
-    printf("%s  ", timebuf);
-    va_list ap;
-    va_start(ap, fmt);
-    vprintf(fmt, ap);
-    va_end(ap);
-    putchar('\n');
-  }
-}
+// As above, but will only display if given verbose flag
+#define logmsgverbose(...) { if (verbose) logmsg(__VA_ARGS__); }
 
 void io_log(int fd, const char *message)
 {
   // Send messages from the IO layer to log
   logmsgverbose("IO fd #%d message: %s", fd, message);
+}
+
+// State dump for debugging
+void dump_state(void)
+{
+  printf("** BEGIN STATE DUMP **\n");
+  printf("Remap array:\n");
+  for (size_t i = 0; i <= max_rpcs_in_flight; i++) {
+    rpc_remap *remap = &remap_array[i];
+    printf("%zd(%p): <%p:%p> <%p:%p> %ld %d %d %d\n",
+           i, remap, remap->prev, remap->next, remap->to_prev, remap->to_next,
+           remap->send_time, remap->client_desc, remap->id, remap->orig_id);
+  }
+  printf("Client lists:\n");
+  for (size_t i = 0; i < max_descriptors; i++) {
+    rpc_remap *remap = &client_list[i];
+    printf("%zd(%p): <%p:%p> <%p:%p> %ld %d %d %d\n",
+           i, remap, remap->prev, remap->next, remap->to_prev, remap->to_next,
+           remap->send_time, remap->client_desc, remap->id, remap->orig_id);
+  }
+  // TODO: add more stuff if needed
+  printf("** END STATE DUMP **\n");
 }
 
 void init_remap_struct(rpc_remap *remap, rpc_remap *prev, rpc_remap *next)
@@ -612,7 +624,7 @@ int main(int argc, char *argv[])
   size_t max_clients = 4;
   errno = 0;
 
-  for (int opt = -1; (opt = getopt(argc, argv, "fhp:c:r:i:v")) != -1; ) {
+  for (int opt = -1; (opt = getopt(argc, argv, "fhvp:c:r:i:t:")) != -1; ) {
     if (opt == 'f') {
       client_mode = CLIENT_MODE_FORWARD;
     } else if (opt == 'h') {
@@ -632,6 +644,8 @@ int main(int argc, char *argv[])
       hub_id[sizeof(hub_id) - 1] = '\0';
     } else if (opt == 'v') {
       verbose = 1;
+    } else if (opt == 't') {
+      timefmt = optarg;
     } else {
       return usage(stderr, argv[0], "Invalid command line option");
     }
@@ -749,8 +763,17 @@ int main(int argc, char *argv[])
         if (poll_array[i].fd >= 0) {
           if (i != n_descriptors) {
             poll_array[n_descriptors] = poll_array[i];
-            if (client_list)
+            if (client_list) {
               client_list[n_descriptors] = client_list[i];
+              rpc_remap *r = client_list[n_descriptors].next;
+              if (r) {
+                r->prev = &client_list[n_descriptors];
+                do {
+                  r->client_desc = n_descriptors;
+                  r = r->next;
+                } while (r);
+              }
+            }
           }
           n_descriptors++;
         }
@@ -813,7 +836,8 @@ int main(int argc, char *argv[])
             logmsg("Error in sensor communication");
           } else {
             // Some other error, e.g. the serial port went down. Exit.
-            logmsg("Fatal error in sensor communication");
+            logmsg("Fatal error in sensor communication [%s]",
+                   strerror(errno));
             keep_running = 0;
             ret = 1;
           }
