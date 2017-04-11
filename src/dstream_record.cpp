@@ -70,7 +70,7 @@ class dstream_key {
   friend class dstream_writer;
 
   dstream_key(int id, const tl_packet_header *hdr):
-    stream_id(id), routing_size(hdr->routing_size) {
+    stream_id(id), routing_size(hdr->routing_size()) {
     memcpy(routing, hdr->routing_data(), routing_size);
   }
 
@@ -174,8 +174,8 @@ int main(int argc, char *argv[])
         }
         memcpy(tl_packet_routing_data(&req.hdr),
                tl_packet_routing_data(&pkt.hdr),
-               pkt.hdr.routing_size);
-        req.hdr.routing_size = pkt.hdr.routing_size;
+               pkt.hdr.routing_size());
+        req.hdr.set_routing_size(pkt.hdr.routing_size());
         if (tlsend(fd, &req) != 0) {
           return 1;
         }
@@ -267,7 +267,7 @@ void dstream_writer::process_desc(const tl_data_stream_desc_header *desc_,
 
     tl_packet_header file_header;
     file_header.type = TL_PTYPE_STREAMDESC;
-    file_header.routing_size = 0;
+    file_header.set_routing_size(0);
     file_header.payload_size = sizeof(desc) + name.length();
 
     out.write(&file_header, sizeof(tl_packet_header));
@@ -304,7 +304,7 @@ bool dstream_writer::process_data(const tl_data_stream_packet *data)
   // packet looks legit. update last sample and write out
   last_sample += delta;
   tl_packet_header hdr = data->hdr;
-  hdr.routing_size = 0;
+  hdr.set_routing_size(0);
   out.write(&hdr, sizeof(hdr));
   out.write(data->hdr.payload_data(), hdr.payload_size);
 

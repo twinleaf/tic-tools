@@ -406,21 +406,23 @@ int sensor_data(size_t ps, tl_packet *packet)
   // If in hub mode, add back routing
   if (sensor_mode == SENSOR_MODE_HUB) {
     // in hub mode, we must add the last hop
-    if (packet->hdr.routing_size >= TL_PACKET_MAX_ROUTING_SIZE) {
+    size_t routing_size = tl_packet_routing_size(&packet->hdr);
+    if (routing_size >= TL_PACKET_MAX_ROUTING_SIZE) {
       // too deep in the sensor tree. don't break because of this
       logmsg("Warning: dropped sensor packet. Full routing in hub mode");
       return SUCCESS;
     }
 
     uint8_t *routing = tl_packet_routing_data(&packet->hdr);
-    routing[packet->hdr.routing_size++] = ps;
+    routing[routing_size++] = ps;
+    tl_packet_set_routing_size(&packet->hdr, routing_size);
   }
 
   if (packet->hdr.type == TL_PTYPE_LOG) {
     tl_log_packet *logp = (tl_log_packet*) packet;
     char path[TL_ROUTING_FMT_BUF_SIZE];
     if (tl_format_routing(tl_packet_routing_data(&packet->hdr),
-                          packet->hdr.routing_size,
+                          tl_packet_routing_size(&packet->hdr),
                           path, sizeof(path)) != 0)
       strcpy(path, "<INVALID PATH>");
     size_t len = tl_log_packet_message_size(logp);
@@ -450,7 +452,8 @@ int sensor_data(size_t ps, tl_packet *packet)
 // Process packets from clients
 int client_data(size_t ps, tl_packet *packet)
 {
-  if ((sensor_mode == SENSOR_MODE_HUB) && !packet->hdr.routing_size) {
+  if ((sensor_mode == SENSOR_MODE_HUB) &&
+      (tl_packet_routing_size(&packet->hdr) == 0)) {
     // This packet is for the proxy. handle and reply
     return hub_packet(ps, packet);
   }
@@ -466,11 +469,11 @@ int client_data(size_t ps, tl_packet *packet)
              req->req.id, poll_array[ps].fd);
       // courtesy reply, send an error to the caller
       uint8_t routing_size, routing[TL_PACKET_MAX_ROUTING_SIZE];
-      routing_size = req->hdr.routing_size;
+      routing_size = tl_packet_routing_size(&req->hdr);
       memcpy(routing, tl_packet_routing_data(&req->hdr), routing_size);
       tl_rpc_make_error(req, TL_RPC_ERROR_BUSY);
       memcpy(tl_packet_routing_data(&req->hdr), routing, routing_size);
-      req->hdr.routing_size += routing_size;
+      tl_packet_set_routing_size(&req->hdr, routing_size);
       if (send_packet(ps, packet) < 0) {
         logmsg("Failed to send back error of too many rpcs in flight");
         return ERROR_LOCAL;
@@ -484,7 +487,7 @@ int client_data(size_t ps, tl_packet *packet)
     remap->orig_id = req->req.id;
     req->req.id = remap->id;
     remap->client_desc = ps;
-    remap->routing_size = req->hdr.routing_size;
+    remap->routing_size = tl_packet_routing_size(&req->hdr);
     memcpy(remap->routing, tl_packet_routing_data(&req->hdr),
            remap->routing_size);
     insert_after(&client_list[ps], remap);
@@ -496,8 +499,9 @@ int client_data(size_t ps, tl_packet *packet)
   // routing.
   size_t dest = 0;
   if (sensor_mode == SENSOR_MODE_HUB) {
-    uint8_t *routing = tl_packet_routing_data(&packet->hdr);
-    dest = routing[--packet->hdr.routing_size];
+    size_t routing_size = tl_packet_routing_size(&packet->hdr);
+    dest = tl_packet_routing_data(&packet->hdr)[--routing_size];
+    tl_packet_set_routing_size(&packet->hdr, routing_size);
   }
 
   if (dest >= n_sensors) {
@@ -805,7 +809,7 @@ int main(int argc, char *argv[])
               tl_rpc_make_error(&req, TL_RPC_ERROR_TIMEOUT);
             memcpy(tl_packet_routing_data(&err->hdr), remap->routing,
                    remap->routing_size);
-            err->hdr.routing_size += remap->routing_size;
+            tl_packet_set_routing_size(&err->hdr, remap->routing_size);
             if (send_packet(remap->client_desc, (tl_packet*)err) < 0) {
               logmsg("Failed to send synthetic RPC timeout error");
               disconnect_client(remap->client_desc);
