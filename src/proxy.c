@@ -115,7 +115,7 @@ int usage(FILE *out, const char *program, const char *error)
   fprintf(out, "  -p port   TCP listen port. default 7855\n");
   fprintf(out, "  -f        client forward mode\n");
   fprintf(out, "  -c max    max simultaneous clients in shared mode, "
-          "default 4\n");
+          "default 8\n");
   fprintf(out, "  -r max    max number of RPCs in flight in shared mode, "
           "default 8\n");
   fprintf(out, "  -h        hub sensor mode\n");
@@ -625,7 +625,7 @@ int client_connection(size_t ps)
 
 int main(int argc, char *argv[])
 {
-  size_t max_clients = 4;
+  size_t max_clients = 8;
   errno = 0;
 
   for (int opt = -1; (opt = getopt(argc, argv, "fhvp:c:r:i:t:")) != -1; ) {
