@@ -833,10 +833,12 @@ int main(int argc, char *argv[])
 
       if (ps < n_sensors) {
         // Event on sensor's descriptor
-        if (handle_tlio(ps) != SUCCESS) {
+        for (;;) {
+          if (handle_tlio(ps) == SUCCESS)
+            break;
           if (errno == EPROTO) {
             // Error in the data. could be corrupted serial data,
-            // keep running
+            // keep running since there could be valid data after the error.
             logmsg("Error in sensor communication");
           } else {
             // Some other error, e.g. the serial port went down. Exit.
@@ -844,9 +846,11 @@ int main(int argc, char *argv[])
                    strerror(errno));
             keep_running = 0;
             ret = 1;
+            break;
           }
-          break;
         }
+        if (!keep_running)
+          break;
       } else if (ps < (n_sensors + n_listen)) {
         // Event on listening sockets
         if (client_connection(ps) != SUCCESS) {
