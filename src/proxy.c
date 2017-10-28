@@ -121,6 +121,7 @@ int usage(FILE *out, const char *program, const char *error)
   fprintf(out, "  -h        hub sensor mode\n");
   fprintf(out, "  -i id     id of the hub\n");
   fprintf(out, "  -v        verbose logging\n");
+  fprintf(out, "  -4        force IPv4 server only\n");
   fprintf(out, "  -t fmt    timestamp format (default \"%%F %%T\", "
           "see man strftime)\n");
   return EX_USAGE;
@@ -625,10 +626,13 @@ int client_connection(size_t ps)
 
 int main(int argc, char *argv[])
 {
+  struct addrinfo ai;
   size_t max_clients = 8;
   errno = 0;
+  memset(&ai, 0, sizeof(ai));
+  ai.ai_family = AF_UNSPEC;
 
-  for (int opt = -1; (opt = getopt(argc, argv, "fhvp:c:r:i:t:")) != -1; ) {
+  for (int opt = -1; (opt = getopt(argc, argv, "fhv4p:c:r:i:t:")) != -1; ) {
     if (opt == 'f') {
       client_mode = CLIENT_MODE_FORWARD;
     } else if (opt == 'h') {
@@ -648,6 +652,8 @@ int main(int argc, char *argv[])
       hub_id[sizeof(hub_id) - 1] = '\0';
     } else if (opt == 'v') {
       verbose = 1;
+    } else if (opt == '4') {
+      ai.ai_family = AF_INET;
     } else if (opt == 't') {
       timefmt = optarg;
     } else {
@@ -682,8 +688,6 @@ int main(int argc, char *argv[])
   }
 
   // Initialize the service sockets (there are usually two, for IPv4 and IPv6
-  struct addrinfo ai;
-  memset(&ai, 0, sizeof(ai));
   ai.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
   ai.ai_socktype = SOCK_STREAM;
   ai.ai_protocol = IPPROTO_TCP;
