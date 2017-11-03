@@ -29,9 +29,6 @@ obj/dstream_dump.o: src/dstream_dump.c $(LIB_HEADERS) | obj
 obj/sensor_tree.o: src/sensor_tree.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
-obj/tim_acq.o: src/tim_acq.c $(LIB_HEADERS) | obj
-	@$(CC) $(CCFLAGS) -c $< -o $@
-
 obj/dstream_record.o: src/dstream_record.cpp $(LIB_HEADERS) | obj
 	@$(CXX) $(CXXFLAGS) -c $< -o $@
 
@@ -47,15 +44,12 @@ bin/dstream_dump: obj/dstream_dump.o $(LIB_FILE) | bin
 bin/sensor_tree: obj/sensor_tree.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
-bin/tim_acq: obj/tim_acq.o $(LIB_FILE) | bin
-	@$(CC) -o $@ $< $(LDFLAGS)
-
 bin/dstream_record: obj/dstream_record.o $(LIB_FILE) | bin
 	@$(CXX) -o $@ $< $(LDFLAGS)
 
 
 all: bin/proxy bin/rpc_req bin/dstream_dump bin/sensor_tree \
-     bin/tim_acq bin/dstream_record
+     bin/dstream_record
 
 clean:
 	@rm -rf obj bin
