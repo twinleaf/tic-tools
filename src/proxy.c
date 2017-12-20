@@ -424,7 +424,7 @@ int sensor_data(size_t ps, tl_packet *packet)
     char path[TL_ROUTING_FMT_BUF_SIZE];
     if (tl_format_routing(tl_packet_routing_data(&packet->hdr),
                           tl_packet_routing_size(&packet->hdr),
-                          path, sizeof(path)) != 0)
+                          path, sizeof(path), 1) != 0)
       strcpy(path, "<INVALID PATH>");
     size_t len = tl_log_packet_message_size(logp);
     char fmt[128];
@@ -441,8 +441,12 @@ int sensor_data(size_t ps, tl_packet *packet)
   }
 
   for (size_t i = client_start; i < client_end; i++) {
+    if (poll_array[i].fd < 0) continue;
+    errno = 0;
     if (send_packet(i, packet) < 0) {
-      logmsg("Failed to send sensor packet to client #%d", poll_array[i].fd);
+      if ((errno != EPIPE) && (errno != ECONNRESET))
+        logmsg("Failed to send sensor packet to client #%d [%s]",
+               poll_array[i].fd, strerror(errno));
       disconnect_client(i);
     }
   }
