@@ -1,0 +1,3 @@
+[submodule "libtio"]
+	path = libtio
+	url = git@github.com:twinleaf/libtio.git

@@ -2,7 +2,7 @@
 # Author: gilberto@tersatech.com
 # License: Proprietary
 
-LIBTIO = ../libtio
+LIBTIO ?= ./libtio
 
 CCFLAGS = -g -Wall -Wextra -I$(LIBTIO)/include/ -std=gnu11
 CXXFLAGS = -g -Wall -Wextra -I$(LIBTIO)/include/ -std=gnu++11
@@ -13,6 +13,9 @@ LDFLAGS = -L$(LIBTIO)/lib/ -ltio
 
 LIB_HEADERS = $(wildcard $(LIBTIO)/include/tio/*.h)
 LIB_FILE = $(LIBTIO)/lib/libtio.a
+
+libtio/lib/libtio.a:
+	@$(MAKE) -C ./libtio
 
 obj bin:
 	@mkdir -p $@
