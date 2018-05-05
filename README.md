@@ -6,7 +6,7 @@ This package implements a communications protocol in python to work with [Twinle
 
 ### proxy
 
-The proxy is run on a serial port and serves TCP access to the sensor. Multiple clients may connect and recieve data. The usage is simply:
+The proxy is run on a serial port and serves TCP access to the sensor. Multiple clients may connect to port 7855 and recieve data. The usage is simply:
 
   $ bin/proxy /dev/cu.ttyUSB0
 
