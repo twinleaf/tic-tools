@@ -49,7 +49,7 @@ void print_tree(int fd, uint8_t *routing, size_t routing_len)
     puts(printbuf);
 
     if (ret == 0) {
-      ret = tl_simple_rpc(fd, "dev.ports", REQ_ID, NULL, 0, &rep,
+      ret = tl_simple_rpc(fd, "dev.port.count", REQ_ID, NULL, 0, &rep,
                           routing, routing_len, NULL);
       if (tl_rpc_reply_payload_size(&rep) == 4)
         nports = *(uint32_t*)(&rep.payload[0]);
