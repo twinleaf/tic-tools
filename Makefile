@@ -23,6 +23,9 @@ obj bin:
 obj/proxy.o: src/proxy.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
+obj/udp_proxy.o: src/udp_proxy.c $(LIB_HEADERS) | obj
+	@$(CC) $(CCFLAGS) -c $< -o $@
+
 obj/rpc_req.o: src/rpc_req.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
@@ -35,6 +38,9 @@ obj/data_stream_dump.o: src/data_stream_dump.c $(LIB_HEADERS) | obj
 bin/proxy: obj/proxy.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
+bin/udp_proxy: obj/udp_proxy.o $(LIB_FILE) | bin
+	@$(CC) -o $@ $< $(LDFLAGS)
+
 bin/rpc_req: obj/rpc_req.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
@@ -45,6 +51,7 @@ bin/data_stream_dump: obj/data_stream_dump.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
 all: bin/proxy \
+     bin/udp_proxy \
      bin/rpc_req \
      bin/sensor_tree \
      bin/data_stream_dump
