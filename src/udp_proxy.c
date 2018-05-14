@@ -4,6 +4,8 @@
 
 // Send sensor data over muticast UDP; test with
 // iperf -s -u -B 226.94.1.1 -i 1
+// Connect using
+// mudp://226.94.1.1:5001
 
 #include <tio/io.h>
 #include <tio/rpc.h>
