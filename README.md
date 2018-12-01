@@ -41,7 +41,3 @@ This set of commands changed decimation to 10 points, turned off the automatic a
 ## Programming
 
 A sockets interface to the sensors is provided. Please review examples and the code to understand its use.
-
-## TODO
-
-  - [ ] proxy automatically changes device into binary mode

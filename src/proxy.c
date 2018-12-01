@@ -1,4 +1,4 @@
-// Copyright: 2016-2017 Twinleaf LLC
+// Copyright: 2016-2018 Twinleaf LLC
 // Author: gilberto@tersatech.com
 // License: Proprietary
 
@@ -718,6 +718,9 @@ int main(int argc, char *argv[])
     poll_array[n_descriptors].events = POLLIN;
     if (poll_array[n_descriptors].fd < 0)
       return error("Failed to open sensor '%s'", url);
+    // Send a NOP packet to switch to binary mode.
+    tl_packet_header heartbeat = { TL_PTYPE_HEARTBEAT, 0, 0 };
+    tlsend(poll_array[n_descriptors].fd, &heartbeat);
   }
 
   // Set up listening sockets
