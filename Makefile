@@ -1,4 +1,4 @@
-# Copyright: 2016-2017 Twinleaf LLC
+# Copyright: 2016-2018 Twinleaf LLC
 # Author: gilberto@tersatech.com
 # License: Proprietary
 
@@ -14,8 +14,11 @@ LDFLAGS = -L$(LIBTIO)/lib/ -ltio
 LIB_HEADERS = $(wildcard $(LIBTIO)/include/tio/*.h)
 LIB_FILE = $(LIBTIO)/lib/libtio.a
 
-libtio/lib/libtio.a:
-	@$(MAKE) -C ./libtio
+LIB_DEPS = $(wildcard $(LIBTIO)/include/tio/*.h) \
+           $(wildcard $(LIBTIO)/src/*.c) $(wildcard $(LIBTIO)/src/*.h)
+
+$(LIB_FILE): $(LIB_DEPS)
+	@$(MAKE) -C $(LIBTIO)
 
 obj bin:
 	@mkdir -p $@
@@ -57,4 +60,5 @@ all: bin/proxy \
      bin/data_stream_dump
 
 clean:
+	@$(MAKE) -C $(LIBTIO) clean
 	@rm -rf obj bin

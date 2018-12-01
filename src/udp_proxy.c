@@ -24,8 +24,7 @@
 
 void proxy_udp(int sensor_fd)
 {
-  int sock, status;
-  char buffer[65536];
+  int sock;
   struct sockaddr_in saddr;
   struct in_addr iaddr;
 
@@ -43,26 +42,16 @@ void proxy_udp(int sensor_fd)
   saddr.sin_addr.s_addr = inet_addr(TIO_UDP_GROUP);
   saddr.sin_port = htons(TIO_UDP_PORT); // Use the first free port
 
-  // put some data in buffer
-  strcpy(buffer, "Hello world\n");
-
-  // receive packet from socket
-  status = sendto(sock, buffer, strlen(buffer), 0, (struct sockaddr *)&saddr, sizeof(saddr));
-
-
   for (;;) {
-    
+
     // Read from sensor
     tl_packet packet;
     errno = 0;
     int ret = tlrecv(sensor_fd, &packet, sizeof(packet));
-    if (ret < 0) {
-      if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
-        break;
+    if (ret <= 0) {
       if (errno == 0)
         perror("disconnected");
-        exit(1);
-      return;
+      exit(1);
     }
 
     // Send to UDP multicast
