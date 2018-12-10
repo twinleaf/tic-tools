@@ -718,9 +718,6 @@ int main(int argc, char *argv[])
     poll_array[n_descriptors].events = POLLIN;
     if (poll_array[n_descriptors].fd < 0)
       return error("Failed to open sensor '%s'", url);
-    // Send a NOP packet to switch to binary mode.
-    tl_packet_header heartbeat = { TL_PTYPE_HEARTBEAT, 0, 0 };
-    tlsend(poll_array[n_descriptors].fd, &heartbeat);
   }
 
   // Set up listening sockets
@@ -795,7 +792,26 @@ int main(int argc, char *argv[])
       }
     }
 
-    struct timespec timeout = { .tv_sec = 1, .tv_nsec = 0 };
+    // At most every 200 ms, send out a heartbeat to each sensor
+    static struct timespec last_heartbeat = { .tv_sec = 0, .tv_nsec = 0 };
+    struct timespec cur_time;
+    clock_gettime(CLOCK_REALTIME, &cur_time);
+    long nsec = cur_time.tv_nsec - last_heartbeat.tv_nsec;
+    time_t sec = cur_time.tv_sec - last_heartbeat.tv_sec;
+    if (nsec < 0) {
+      nsec += 1000000000;
+      sec -= 1;
+    }
+    if ((sec != 0) || (nsec > 200000000)) {
+      tl_packet_header heartbeat = { TL_PTYPE_HEARTBEAT, 0, 0 };
+      memcpy(&last_heartbeat, &cur_time, sizeof(struct timespec));
+      for (size_t i = 0; i < n_sensors; i++) {
+        // Send a NOP packet to switch to binary mode.
+        tlsend(poll_array[i].fd, &heartbeat);
+      }
+    }
+
+    struct timespec timeout = { .tv_sec = 0, .tv_nsec = 100000000 };
     int n_events = ppoll(poll_array, n_descriptors, &timeout, &sigmask);
     if (n_events < 0) {
       if (errno != EINTR) {
