@@ -32,6 +32,9 @@ obj/udp_proxy.o: src/udp_proxy.c $(LIB_HEADERS) | obj
 obj/rpc_req.o: src/rpc_req.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
+obj/firmware_upgrade.o: src/firmware_upgrade.c $(LIB_HEADERS) | obj
+	@$(CC) $(CCFLAGS) -c $< -o $@
+
 obj/sensor_tree.o: src/sensor_tree.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
@@ -47,6 +50,9 @@ bin/udp_proxy: obj/udp_proxy.o $(LIB_FILE) | bin
 bin/rpc_req: obj/rpc_req.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
+bin/firmware_upgrade: obj/firmware_upgrade.o $(LIB_FILE) | bin
+	@$(CC) -o $@ $< $(LDFLAGS)
+
 bin/sensor_tree: obj/sensor_tree.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
@@ -56,6 +62,7 @@ bin/data_stream_dump: obj/data_stream_dump.o $(LIB_FILE) | bin
 all: bin/proxy \
      bin/udp_proxy \
      bin/rpc_req \
+     bin/firmware_upgrade \
      bin/sensor_tree \
      bin/data_stream_dump
 
