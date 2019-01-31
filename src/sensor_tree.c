@@ -1,6 +1,6 @@
 // Copyright: 2017 Twinleaf LLC
 // Author: gilberto@tersatech.com
-// License: Proprietary
+// License: MIT
 
 // program to traverse and print out a sensor tree given a root url
 // NOTE: right now it requires running through a proxy that times out
