@@ -70,12 +70,13 @@ clean:
 	@$(MAKE) -C $(LIBTIO) clean
 	@rm -rf obj bin
 
-INSTALL_PATH ?= /usr/local/bin/
-install:
-	install bin/tio-proxy $(INSTALL_PATH)
-	install bin/tio-rpc $(INSTALL_PATH)	
-	install bin/tio-firmware-upgrade $(INSTALL_PATH)	
-	#install bin/tio-udp-proxy $(INSTALL_PATH)	
-	#install bin/tio-sensor-tree $(INSTALL_PATH)	
-	#install bin/tio-data-stream-dump $(INSTALL_PATH)	
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+install: all
+	@cp -p bin/tio-proxy $(DESTDIR)$(BINDIR)/
+	@cp -p bin/tio-rpc $(DESTDIR)$(BINDIR)/
+	@cp -p bin/tio-firmware-upgrade $(DESTDIR)$(BINDIR)/
+#@cp -p bin/tio-udp-proxy $(DESTDIR)$(BINDIR)/
+#@cp -p bin/tio-sensor-tree $(DESTDIR)$(BINDIR)/
+#@cp -p bin/tio-data-stream-dump $(DESTDIR)$(BINDIR)/
 
