@@ -23,49 +23,59 @@ $(LIB_FILE): $(LIB_DEPS)
 obj bin:
 	@mkdir -p $@
 
-obj/proxy.o: src/proxy.c $(LIB_HEADERS) | obj
+obj/tio-proxy.o: src/tio-proxy.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
-obj/udp_proxy.o: src/udp_proxy.c $(LIB_HEADERS) | obj
+obj/tio-udp-proxy.o: src/tio-udp-proxy.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
-obj/rpc_req.o: src/rpc_req.c $(LIB_HEADERS) | obj
+obj/tio-rpc.o: src/tio-rpc.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
-obj/firmware_upgrade.o: src/firmware_upgrade.c $(LIB_HEADERS) | obj
+obj/tio-firmware-upgrade.o: src/tio-firmware-upgrade.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
-obj/sensor_tree.o: src/sensor_tree.c $(LIB_HEADERS) | obj
+obj/tio-sensor-tree.o: src/tio-sensor-tree.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
-obj/data_stream_dump.o: src/data_stream_dump.c $(LIB_HEADERS) | obj
+obj/tio-data-stream-dump.o: src/tio-data-stream-dump.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
-bin/proxy: obj/proxy.o $(LIB_FILE) | bin
+bin/tio-proxy: obj/tio-proxy.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
-bin/udp_proxy: obj/udp_proxy.o $(LIB_FILE) | bin
+bin/tio-udp-proxy: obj/tio-udp-proxy.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
-bin/rpc_req: obj/rpc_req.o $(LIB_FILE) | bin
+bin/tio-rpc: obj/tio-rpc.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
-bin/firmware_upgrade: obj/firmware_upgrade.o $(LIB_FILE) | bin
+bin/tio-firmware-upgrade: obj/tio-firmware-upgrade.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
-bin/sensor_tree: obj/sensor_tree.o $(LIB_FILE) | bin
+bin/tio-sensor-tree: obj/tio-sensor-tree.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
-bin/data_stream_dump: obj/data_stream_dump.o $(LIB_FILE) | bin
+bin/tio-data-stream-dump: obj/tio-data-stream-dump.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
-all: bin/proxy \
-     bin/udp_proxy \
-     bin/rpc_req \
-     bin/firmware_upgrade \
-     bin/sensor_tree \
-     bin/data_stream_dump
+all: bin/tio-proxy \
+     bin/tio-rpc \
+     bin/tio-firmware-upgrade \
+     bin/tio-udp-proxy \
+     bin/tio-sensor-tree \
+     bin/tio-data-stream-dump
 
 clean:
 	@$(MAKE) -C $(LIBTIO) clean
 	@rm -rf obj bin
+
+INSTALL_PATH ?= /usr/local/bin/
+install:
+	install bin/tio-proxy $(INSTALL_PATH)
+	install bin/tio-rpc $(INSTALL_PATH)	
+	install bin/tio-firmware-upgrade $(INSTALL_PATH)	
+	#install bin/tio-udp-proxy $(INSTALL_PATH)	
+	#install bin/tio-sensor-tree $(INSTALL_PATH)	
+	#install bin/tio-data-stream-dump $(INSTALL_PATH)	
+
