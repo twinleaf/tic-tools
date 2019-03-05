@@ -15,7 +15,7 @@ int single_line = 1;
 void print_data(tl_data_stream_packet *dsp, int stream_id, const char *route)
 {
   size_t data_len = dsp->hdr.payload_size - sizeof(uint32_t);
-  printf("%s/dstream%d sample %u, %zd bytes:", route, stream_id,
+  printf("%s/stream%d sample %u, %zd bytes:", route, stream_id,
          dsp->start_sample, data_len);
   if (single_line) {
     for (size_t i = 0; i < data_len; i++)
@@ -84,7 +84,7 @@ void print_timebase(tl_timebase_info *tbi, const char *route)
   printf(" stability %f ppm\n", tbi->stability * 1e6);
 }
 
-void print_pstream(tl_pstream_info *psi, const char *name, const char *route)
+void print_source(tl_source_info *psi, const char *name, const char *route)
 {
   const char *type = "unknown";
   switch (psi->type) {
@@ -104,33 +104,33 @@ void print_pstream(tl_pstream_info *psi, const char *name, const char *route)
     type = "float64";
     break;
   }
-  printf ("%s/pstream%d \"%s\"%s: ", route, psi->id, name,
-          (psi->flags & TL_PSTREAM_DELETED) ? " (DELETED)" : "");
+  printf ("%s/source%d \"%s\"%s: ", route, psi->id, name,
+          (psi->flags & TL_SOURCE_DELETED) ? " (DELETED)" : "");
   printf("timebase %d period %d offset %d  %dx(%s)\n", psi->timebase_id,
          psi->period, psi->offset, psi->channels, type);
 }
 
-void print_dstream(tl_dstream_info *dsi, tl_dstream_component_info *dci,
+void print_stream(tl_stream_info *dsi, tl_stream_component_info *dci,
                    const char *route)
 {
-  printf ("%s/dstream%d: timebase %d period %d offset %d sample %lu\n",
+  printf ("%s/stream%d: timebase %d period %d offset %d sample %lu\n",
           route, dsi->id, dsi->timebase_id, dsi->period, dsi->offset,
           (unsigned long)dsi->sample_number);
 
-  if (dsi->flags & TL_DSTREAM_DELETED) {
+  if (dsi->flags & TL_STREAM_DELETED) {
     printf("    DELETED\n");
     dsi->total_components = 0;
-  } else if (!(dsi->flags & TL_DSTREAM_ACTIVE)) {
+  } else if (!(dsi->flags & TL_STREAM_ACTIVE)) {
     printf("    INACTIVE\n");
     dsi->total_components = 0;
-  } else if (dsi->flags & TL_DSTREAM_ONLY_INFO) {
+  } else if (dsi->flags & TL_STREAM_ONLY_INFO) {
     printf("    INFO-UPDATE (%d components)\n", dsi->total_components);
     dsi->total_components = 0;
   }
 
   for (uint16_t i = 0; i < dsi->total_components; i++) {
-    printf("    %d: pstream %d%s period %d offset %d\n", i,
-           dci[i].pstream_id, (dci[i].flags & TL_DSTREAM_COMPONENT_RESAMPLED) ?
+    printf("    %d: source %d%s period %d offset %d\n", i,
+           dci[i].source_id, (dci[i].flags & TL_STREAM_COMPONENT_RESAMPLED) ?
            " RESAMPLED" : "", dci[i].period, dci[i].offset);
   }
 }
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
   int list = 0;
   int updates_only = 0;
   int initial_refresh = 0;
-  int exclude_default_dstream = 0;
+  int exclude_default_stream = 0;
 
   for (int opt = -1; (opt = getopt(argc, argv, "r:s:cluxi")) != -1; ) {
     if (opt == 'r') {
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
     } else if (opt == 'u') {
       updates_only = 1;
     } else if (opt == 'x') {
-      exclude_default_dstream = 1;
+      exclude_default_stream = 1;
     } else if (opt == 'i') {
       initial_refresh = 1;
     } else {
@@ -180,19 +180,19 @@ int main(int argc, char *argv[])
 
   if (list) {
     tl_rpc_reply_packet rep;
-    if (tl_simple_rpc(fd, "data.pstream.list", 0, NULL, 0, &rep,
+    if (tl_simple_rpc(fd, "data.source.list", 0, NULL, 0, &rep,
                       NULL, 0, NULL) != 0) {
       printf("HERE.0\n");
       return 1;
     }
     uint16_t n = *(uint16_t*) rep.payload;
     for (uint16_t i = 0; i < n; i++) {
-      if (tl_simple_rpc(fd, "data.pstream.list", 0, &i, sizeof(i), &rep,
+      if (tl_simple_rpc(fd, "data.source.list", 0, &i, sizeof(i), &rep,
                       NULL, 0, NULL) != 0)
         return 1;
       rep.payload[tl_rpc_reply_payload_size(&rep)] = '\0';
-      tl_pstream_info *psi = (tl_pstream_info*) rep.payload;
-      print_pstream(psi, (const char*) (psi+1), "");
+      tl_source_info *psi = (tl_source_info*) rep.payload;
+      print_source(psi, (const char*) (psi+1), "");
     }
     return 0;
   }
@@ -215,19 +215,19 @@ int main(int argc, char *argv[])
                       route_str, sizeof(route_str), 0);
     int id = tl_packet_stream_id(&pkt.hdr);
     if (id >= 0) {
-      if (!updates_only && (!exclude_default_dstream || (id != 0)))
+      if (!updates_only && (!exclude_default_stream || (id != 0)))
         print_data((tl_data_stream_packet*) &pkt, id, route_str);
     } else if (pkt.hdr.type == TL_PTYPE_TIMEBASE) {
       tl_timebase_update_packet *tbu = (tl_timebase_update_packet*) &pkt;
       print_timebase(&tbu->info, route_str);
-    } else if (pkt.hdr.type == TL_PTYPE_PSTREAM) {
+    } else if (pkt.hdr.type == TL_PTYPE_SOURCE) {
       // Null terminate the name string
       pkt.payload[pkt.hdr.payload_size] = '\0';
-      tl_pstream_update_packet *psu = (tl_pstream_update_packet*) &pkt;
-      print_pstream(&psu->info, psu->name, route_str);
-    } else if (pkt.hdr.type == TL_PTYPE_DSTREAM) {
-      tl_dstream_update_packet *dsu = (tl_dstream_update_packet*) &pkt;
-      print_dstream(&dsu->info, dsu->component, route_str);
+      tl_source_update_packet *psu = (tl_source_update_packet*) &pkt;
+      print_source(&psu->info, psu->name, route_str);
+    } else if (pkt.hdr.type == TL_PTYPE_STREAM) {
+      tl_stream_update_packet *dsu = (tl_stream_update_packet*) &pkt;
+      print_stream(&dsu->info, dsu->component, route_str);
     } else if (pkt.hdr.type == TL_PTYPE_HEARTBEAT) {
       print_heartbeat(&pkt, route_str);
     }
