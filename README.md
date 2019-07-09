@@ -38,6 +38,16 @@ This set of commands changed decimation to 10 points, turned off the automatic a
   - macOS
   - Windows subsystem for linux
 
+## Installation
+
+Clone this repository, clone the submodule, build, and install:
+
+  git clone https://github.com/twinleaf/tio-tools.git
+  cd tio-tools
+  git submodule update --init
+  make
+  sudo make install
+
 ## Programming
 
 A sockets interface to the sensors is provided. Please review examples and the code to understand its use.
