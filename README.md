@@ -1,6 +1,6 @@
 # Twinleaf I/O C Tools
 
-This package implements a communications protocol in python to work with [Twinleaf sensors](http://www.twinleaf.com) using [Twinleaf I/O (TIO)](https://github.com/twinleaf/libtio/blob/master/doc/TIO%20Protocol%20Overview.md) as the communications layer. Data from the sensors is received via PUB messages and sensor parameters may be changed using REQ/REP messages. 
+This package implements a communications protocol in C to work with [Twinleaf sensors](http://www.twinleaf.com) using [Twinleaf I/O (TIO)](https://github.com/twinleaf/libtio/blob/master/doc/TIO%20Protocol%20Overview.md) as the communications layer. Data from the sensors is received via PUB messages and sensor parameters may be changed using REQ/REP messages. 
 
 ## Tools included
 
@@ -10,7 +10,7 @@ The proxy is run on a serial port and serves TCP access to the sensor. Multiple 
 
   $ bin/proxy /dev/cu.ttyUSB0
 
-where the serial device varies across platforms. The [labview](https://github.com/twinleaf/tio-labview) and [python](https://github.com/twinleaf/tio-python) clients may simultaneously connect to the proxy server. 
+where the serial device varies across platforms. The [labview](https://github.com/twinleaf/tio-labview) and [python](https://github.com/twinleaf/tio-python) clients may simultaneously connect to the proxy server. In WSL, please note the COM port in the Device Manager and then use /dev/ttyS3 for COM3. 
 
 ### rpc_req
 
@@ -32,11 +32,10 @@ This set of commands changed decimation to 10 points, turned off the automatic a
 
 ## Prerequisites
 
-[libtio](https://github.com/twinleaf/libtio) is an included submodule. Be sure to run `git submodule update --init` after cloning this repository. The tools compile and run with no dependencies on standard POSIX systems:
+[libtio](https://github.com/twinleaf/libtio) is an included submodule. Be sure to run `git submodule update --init` after cloning this repository. The tools compile and run on standard POSIX systems. To get a build environment use:
 
-  - Linux
-  - macOS
-  - Windows subsystem for linux
+  - Linux and WSL (Ubuntu): `apt install build-essential`
+  - macOS: `xcode-select --install`
 
 ## Installation
 
