@@ -22,6 +22,9 @@
 #include <poll.h>
 #include <sysexits.h>
 
+#define MAX_CLIENTS_DEFAULT 16
+#define MAX_RPCS_DEFAULT 16
+
 #if defined (__linux__)
 // For some reason, at least on some linux systems there is no declaration
 // of ppoll, even defining _GNU_SOURCE. Provide it here, since having it
@@ -96,7 +99,7 @@ struct rpc_remap {
 };
 typedef struct rpc_remap rpc_remap;
 
-size_t max_rpcs_in_flight = 4;
+size_t max_rpcs_in_flight = MAX_RPCS_DEFAULT;
 rpc_remap *remap_array;
 rpc_remap *client_list;
 rpc_remap orphan_list;
@@ -115,9 +118,9 @@ int usage(FILE *out, const char *program, const char *error)
   fprintf(out, "  -p port   TCP listen port. default 7855\n");
   fprintf(out, "  -f        client forward mode\n");
   fprintf(out, "  -c max    max simultaneous clients in shared mode, "
-          "default 8\n");
+          "default %d\n", MAX_CLIENTS_DEFAULT);
   fprintf(out, "  -r max    max number of RPCs in flight in shared mode, "
-          "default 8\n");
+          "default %d\n", MAX_RPCS_DEFAULT);
   fprintf(out, "  -h        hub sensor mode\n");
   fprintf(out, "  -i id     id of the hub\n");
   fprintf(out, "  -v        verbose logging\n");
@@ -631,7 +634,7 @@ int client_connection(size_t ps)
 int main(int argc, char *argv[])
 {
   struct addrinfo ai;
-  size_t max_clients = 8;
+  size_t max_clients = MAX_CLIENTS_DEFAULT;
   errno = 0;
   memset(&ai, 0, sizeof(ai));
   ai.ai_family = AF_UNSPEC;
