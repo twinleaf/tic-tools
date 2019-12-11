@@ -1,4 +1,4 @@
-// Copyright: 2016-2018 Twinleaf LLC
+// Copyright: 2016-2019 Twinleaf LLC
 // Author: gilberto@tersatech.com
 // License: MIT
 
@@ -430,8 +430,6 @@ int sensor_data(size_t ps, tl_packet *packet)
                           path, sizeof(path), 1) != 0)
       strcpy(path, "<INVALID PATH>");
     size_t len = tl_log_packet_message_size(logp);
-    char fmt[128];
-    snprintf(fmt, sizeof(fmt), "%%s %%s: %%.%zds", len);
     const char *type = "UNKNOWN";
     switch(logp->log.level) {
      case TL_LOG_CRITICAL: type = "CRITICAL"; break;
@@ -440,7 +438,15 @@ int sensor_data(size_t ps, tl_packet *packet)
      case TL_LOG_INFO: type = "INFO"; break;
      case TL_LOG_DEBUG: type = "DEBUG"; break;
     }
-    logmsg(fmt, path, type, logp->message);
+    logmsg("%s %s: %.*s", path, type, len, logp->message);
+  }
+
+  if (packet->hdr.type == TL_PTYPE_TEXT) {
+    logmsg("TEXT (%zd bytes): %.*s", packet->hdr.payload_size,
+	   packet->hdr.payload_size, (const char*)packet->payload);
+    // automatically send out heartbeat to switch to binary mode
+    tl_packet_header heartbeat = { TL_PTYPE_HEARTBEAT, 0, 0 };
+    send_packet(ps, (struct tl_packet*) &heartbeat);
   }
 
   for (size_t i = client_start; i < client_end; i++) {
@@ -810,7 +816,7 @@ int main(int argc, char *argv[])
       memcpy(&last_heartbeat, &cur_time, sizeof(struct timespec));
       for (size_t i = 0; i < n_sensors; i++) {
         // Send a NOP packet to switch to binary mode.
-        tlsend(poll_array[i].fd, &heartbeat);
+        send_packet(i, (struct tl_packet*) &heartbeat);
       }
     }
 
