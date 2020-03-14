@@ -72,6 +72,13 @@ int main(int argc, char *argv[])
   tl_rpc_reply_packet rep;
   int ret;
 
+  // Stop device
+  ret = tl_simple_rpc(fd, "dev.stop", 0, NULL, 0, &rep,
+                      routing, routing_len, NULL);
+  if (ret < 0) {
+    fprintf(stderr, "Error stopping device; RPC failed: %s\n", strerror(errno));
+  }
+
   for (;;) {
     uint8_t buf[288];
     ssize_t size = pread(firmware_fd, buf, sizeof(buf), offset);
