@@ -5,7 +5,7 @@
 LIBTIO ?= ./libtio
 
 CCFLAGS = -g -Wall -Wextra -I$(LIBTIO)/include/ -std=gnu11
-CXXFLAGS = -g -Wall -Wextra -I$(LIBTIO)/include/ -std=gnu++11
+CXXFLAGS = -g -Wall -Wextra -I$(LIBTIO)/include/ -std=gnu++17
 LDFLAGS = -L$(LIBTIO)/lib/ -ltio
 
 .DEFAULT_GOAL = all
@@ -41,6 +41,9 @@ obj/tio-sensor-tree.o: src/tio-sensor-tree.c $(LIB_HEADERS) | obj
 obj/tio-data-stream-dump.o: src/tio-data-stream-dump.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
+obj/tio-logparse.o: src/tio-logparse.cpp $(LIB_HEADERS) | obj
+	@$(CXX) $(CXXFLAGS) -c $< -o $@
+
 bin/tio-proxy: obj/tio-proxy.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
@@ -59,12 +62,16 @@ bin/tio-sensor-tree: obj/tio-sensor-tree.o $(LIB_FILE) | bin
 bin/tio-data-stream-dump: obj/tio-data-stream-dump.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
+bin/tio-logparse: obj/tio-logparse.o $(LIB_FILE) | bin
+	@$(CXX) -o $@ $< $(LDFLAGS)
+
 all: bin/tio-proxy \
      bin/tio-rpc \
      bin/tio-firmware-upgrade \
      bin/tio-udp-proxy \
      bin/tio-sensor-tree \
-     bin/tio-data-stream-dump
+     bin/tio-data-stream-dump \
+     bin/tio-logparse
 
 clean:
 	@$(MAKE) -C $(LIBTIO) clean
