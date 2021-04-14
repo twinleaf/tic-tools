@@ -1,4 +1,4 @@
-# Copyright: 2016-2018 Twinleaf LLC
+# Copyright: 2016-2021 Twinleaf LLC
 # Author: gilberto@tersatech.com
 # License: MIT
 
@@ -47,6 +47,9 @@ obj/tio-logparse.o: src/tio-logparse.cpp $(LIB_HEADERS) | obj
 bin/tio-proxy: obj/tio-proxy.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
+obj/tio-record.o: src/tio-record.c $(LIB_HEADERS) | obj
+	@$(CC) $(CCFLAGS) -c $< -o $@
+
 bin/tio-udp-proxy: obj/tio-udp-proxy.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
@@ -65,13 +68,17 @@ bin/tio-data-stream-dump: obj/tio-data-stream-dump.o $(LIB_FILE) | bin
 bin/tio-logparse: obj/tio-logparse.o $(LIB_FILE) | bin
 	@$(CXX) -o $@ $< $(LDFLAGS)
 
+bin/tio-record: obj/tio-record.o $(LIB_FILE) | bin
+	@$(CC) -o $@ $< $(LDFLAGS)
+
 all: bin/tio-proxy \
      bin/tio-rpc \
      bin/tio-firmware-upgrade \
      bin/tio-udp-proxy \
      bin/tio-sensor-tree \
      bin/tio-data-stream-dump \
-     bin/tio-logparse
+     bin/tio-logparse \
+     bin/tio-record
 
 clean:
 	@$(MAKE) -C $(LIBTIO) clean
