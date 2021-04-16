@@ -1,0 +1,10 @@
+{
+  "actions" : {
+    "build" : {
+      "enabled" : true,
+      "script" : "make"
+    }
+  },
+  "identifier" : "E2F37FF4-85BC-47D6-9B77-CE5E8F76183F",
+  "openLogOnRun" : "fail"
+}

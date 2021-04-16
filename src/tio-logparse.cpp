@@ -197,9 +197,9 @@ std::string bin2string(uint8_t **pdataptr, uint8_t tio_type)
   return std::string(fmtbuf);
 };
 
-#define INITIAL_QUEUE 1000
-#define DELTA_T        5.0
-#define EPSILON       1e-5
+#define INITIAL_QUEUE 200000
+#define DELTA_T          5.0
+#define EPSILON         1e-5
 
 void tio_row_merger::write_next_row()
 {
@@ -428,9 +428,11 @@ int main(int argc, char *argv[])
           descs.push_back(c.desc);
         }
       }
-
+      // Write first header line
       fprintf(merger.fp, "%s\n", tabjoin(names).c_str());
-      fprintf(merger.fp, "%s\n", tabjoin(descs).c_str());
+      // Write second header line with descriptions and units
+      // Some tools expect just one line to label the data, so this is disabled:
+      // fprintf(merger.fp, "%s\n", tabjoin(descs).c_str());
     }
   }
 

@@ -90,6 +90,8 @@ install: all
 	@cp -p bin/tio-proxy $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-rpc $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-firmware-upgrade $(DESTDIR)$(BINDIR)/
+	@cp -p bin/tio-record $(DESTDIR)$(BINDIR)/
+	@cp -p bin/tio-logparse $(DESTDIR)$(BINDIR)/
 #@cp -p bin/tio-udp-proxy $(DESTDIR)$(BINDIR)/
 #@cp -p bin/tio-sensor-tree $(DESTDIR)$(BINDIR)/
 #@cp -p bin/tio-data-stream-dump $(DESTDIR)$(BINDIR)/
