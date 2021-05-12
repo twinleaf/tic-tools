@@ -36,6 +36,7 @@ This set of commands changed decimation to 10 points, turned off the automatic a
 
   - Linux and WSL (Ubuntu): `apt install build-essential`
   - macOS: `xcode-select --install`
+  - WSL: WSL 2 does not support serial ports, so downgrade to 1 using `PS> wsl --set-version Ubuntu-20.04 1`
 
 ## Installation
 
