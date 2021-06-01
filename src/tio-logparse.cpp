@@ -1,4 +1,4 @@
-// Copyright: 2020 Twinleaf LLC
+// Copyright: 2020-2021 Twinleaf LLC
 // Author: gilberto@tersatech.com
 // License: MIT
 
@@ -361,13 +361,18 @@ int main(int argc, char *argv[])
 
         const tl_source_info &si = it->second.info;
         if (si.channels == 1) {
-          colvec.push_back(column(addr_prefix + name, desc + ", " + units[0],
+          std::string units_str = "";
+          if (!units.empty())
+            units_str = units[0];
+          colvec.push_back(column(addr_prefix + name, desc + ", " + units_str,
                                   si.type, comp.period));
         } else {
           for (size_t i = 0; i < si.channels; i++) {
-            std::string units_str = units[0];
-            if (units.size() > 1)
+            std::string units_str = "";
+            if (units.size() > i)
               units_str = units[i];
+            else if (!units.empty())
+              units_str = units[0];
             colvec.push_back(column(addr_prefix + name + "." + channel_names[i],
                                     desc + ", " + units_str,
                                     si.type, comp.period));
@@ -490,7 +495,7 @@ int main(int argc, char *argv[])
     // Format sample and push it to the stream's map.
     std::vector<std::string> &sample_data = stream.samples[t];
     if (!sample_data.empty()) {
-      printf("Duplicate sample at time %.6f for stream %s%d, keeping latest",
+      printf("Duplicate sample at time %.6f for stream %s%d, keeping latest\n",
              t, tn->path.c_str(), it->first);
       sample_data.clear();
     }
