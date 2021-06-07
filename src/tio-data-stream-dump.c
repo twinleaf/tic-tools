@@ -171,7 +171,8 @@ int main(int argc, char *argv[])
   }
 
   char sensor_url[256];
-  snprintf(sensor_url, sizeof(sensor_url), "%s/%s", root_url, sensor_path);
+  snprintf(sensor_url, sizeof(sensor_url), "%s%s%s", root_url,
+           strlen(sensor_path) ? "/" : "", sensor_path);
   int fd = tlopen(sensor_url, 0, NULL);
   if (fd < 0) {
     fprintf(stderr, "Failed to open %s: %s\n", sensor_url, strerror(errno));
