@@ -71,7 +71,11 @@ bin/tio-logparse: obj/tio-logparse.o $(LIB_FILE) | bin
 bin/tio-record: obj/tio-record.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
+bin/tio-autoproxy.sh: src/tio-autoproxy.sh | bin
+	@install $< $@
+
 all: bin/tio-proxy \
+     bin/tio-autoproxy.sh \
      bin/tio-rpc \
      bin/tio-firmware-upgrade \
      bin/tio-udp-proxy \
@@ -88,6 +92,7 @@ PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 install: all
 	@cp -p bin/tio-proxy $(DESTDIR)$(BINDIR)/
+	@cp -p bin/tio-autoproxy.sh $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-rpc $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-firmware-upgrade $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-record $(DESTDIR)$(BINDIR)/

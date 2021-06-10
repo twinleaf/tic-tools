@@ -1,5 +1,4 @@
-// Copyright: 2016-2019 Twinleaf LLC
-// Author: gilberto@tersatech.com
+// Copyright: 2016-2021 Twinleaf LLC
 // License: MIT
 
 #include <tio/io.h>
@@ -83,6 +82,10 @@ size_t n_listen = 0;
 size_t n_descriptors = 0;
 size_t max_descriptors = 0;
 
+const char **sensor_url = NULL;
+int sensor_reconnect_timeout = 60;
+struct timespec last_reconnect_attempt;
+
 struct pollfd *poll_array = NULL;
 
 int disconnected_clients_flag = 0;
@@ -127,6 +130,8 @@ int usage(FILE *out, const char *program, const char *error)
   fprintf(out, "  -4        force IPv4 server only\n");
   fprintf(out, "  -t fmt    timestamp format (default \"%%F %%T\", "
           "see man strftime)\n");
+  fprintf(out, "  -T sec    seconds to auto-reconnect a sensor before "
+          "exiting (default 60)\n");
   return EX_USAGE;
 }
 
@@ -463,6 +468,17 @@ int sensor_data(size_t ps, tl_packet *packet)
   return SUCCESS;
 }
 
+// Closes a sensor and sets things up for automatic reconnection
+void close_sensor(int sensor)
+{
+  tlclose(poll_array[sensor].fd);
+  poll_array[sensor].fd = -1;
+  if (sensor_reconnect_timeout > 0) {
+    clock_gettime(CLOCK_REALTIME, &last_reconnect_attempt);
+    last_reconnect_attempt.tv_sec += sensor_reconnect_timeout;
+  }
+}
+
 // Process packets from clients
 int client_data(size_t ps, tl_packet *packet)
 {
@@ -527,12 +543,17 @@ int client_data(size_t ps, tl_packet *packet)
     return SUCCESS;
   }
 
-  int ret = send_packet(dest, packet);
-  if (ret < 0) {
-    logmsg("Error writing to sensor %zd: %s", dest, strerror(errno));
-    return ERROR_CRITICAL;
+  int ret = 1;
+  if (poll_array[dest].fd >= 0) {
+    ret = send_packet(dest, packet);
+    if (ret < 0) {
+      logmsg("Error writing to sensor %zd: %s", dest, strerror(errno));
+      if (sensor_reconnect_timeout == 0)
+        return ERROR_CRITICAL;
+      close_sensor(dest);
+    }
   }
-  if (ret == 1) {
+  if (ret != 0) {
     logmsg("Packet dropped from client #%d to sensor %zd",
            poll_array[dest].fd, dest);
   }
@@ -645,7 +666,7 @@ int main(int argc, char *argv[])
   memset(&ai, 0, sizeof(ai));
   ai.ai_family = AF_UNSPEC;
 
-  for (int opt = -1; (opt = getopt(argc, argv, "fhv4p:c:r:i:t:")) != -1; ) {
+  for (int opt = -1; (opt = getopt(argc, argv, "fhv4p:c:r:i:t:T:")) != -1; ) {
     if (opt == 'f') {
       client_mode = CLIENT_MODE_FORWARD;
     } else if (opt == 'h') {
@@ -669,6 +690,8 @@ int main(int argc, char *argv[])
       ai.ai_family = AF_INET;
     } else if (opt == 't') {
       timefmt = optarg;
+    } else if (opt == 'T') {
+      sensor_reconnect_timeout = atoi(optarg);
     } else {
       return usage(stderr, argv[0], "Invalid command line option");
     }
@@ -678,6 +701,7 @@ int main(int argc, char *argv[])
     max_clients = 1;
 
   n_sensors = argc - optind;
+  sensor_url = (const char**) (argv + optind);
 
   if (n_sensors == 0)
     return usage(stderr, argv[0], "No sensors specified");
@@ -722,7 +746,7 @@ int main(int argc, char *argv[])
 
   // Connect to all sensors
   for (n_descriptors = 0; n_descriptors < n_sensors; n_descriptors++) {
-    const char *url = argv[optind + n_descriptors];
+    const char *url = sensor_url[n_descriptors];
     poll_array[n_descriptors].fd = tlopen(url, O_NONBLOCK|O_CLOEXEC, &io_log);
     poll_array[n_descriptors].events = POLLIN;
     if (poll_array[n_descriptors].fd < 0)
@@ -801,7 +825,8 @@ int main(int argc, char *argv[])
       }
     }
 
-    // At most every 200 ms, send out a heartbeat to each sensor
+    // At most every 200 ms, send out a heartbeat to each sensor.
+    // If a sensor was disconnected, attempt to reconnect.
     static struct timespec last_heartbeat = { .tv_sec = 0, .tv_nsec = 0 };
     struct timespec cur_time;
     clock_gettime(CLOCK_REALTIME, &cur_time);
@@ -815,9 +840,28 @@ int main(int argc, char *argv[])
       tl_packet_header heartbeat = { TL_PTYPE_HEARTBEAT, 0, 0 };
       memcpy(&last_heartbeat, &cur_time, sizeof(struct timespec));
       for (size_t i = 0; i < n_sensors; i++) {
-        // Send a NOP packet to switch to binary mode.
-        send_packet(i, (struct tl_packet*) &heartbeat);
+        if (poll_array[i].fd >= 0) {
+          // Send a NOP packet to switch to binary mode.
+          send_packet(i, (struct tl_packet*) &heartbeat);
+        } else {
+          // Attempt to reconnect, or exit if too much time has passed
+          const char *url = sensor_url[i];
+          poll_array[i].fd = tlopen(url, O_NONBLOCK|O_CLOEXEC, &io_log);
+          if (poll_array[i].fd >= 0) {
+            logmsg("Successfully reopened sensor at %s", url);
+          } else if (sensor_reconnect_timeout > 0) {
+            if ((cur_time.tv_sec > last_reconnect_attempt.tv_sec) ||
+                ((cur_time.tv_sec == last_reconnect_attempt.tv_sec) &&
+                 (cur_time.tv_nsec > last_reconnect_attempt.tv_nsec))) {
+              keep_running = 0;
+              ret = error("sensor reconnect timeout");
+              break;
+            }
+          }
+        }
       }
+      if (keep_running == 0)
+        continue;
     }
 
     struct timespec timeout = { .tv_sec = 0, .tv_nsec = 100000000 };
@@ -869,19 +913,24 @@ int main(int argc, char *argv[])
 
       if (ps < n_sensors) {
         // Event on sensor's descriptor
-        for (;;) {
+        while (poll_array[ps].fd >= 0) {
           if (handle_tlio(ps) == SUCCESS)
             break;
           if (errno == EPROTO) {
             // Error in the data. could be corrupted serial data,
             // keep running since there could be valid data after the error.
             logmsg("Error in sensor communication");
-          } else {
+          } else if (sensor_reconnect_timeout == 0) {
             // Some other error, e.g. the serial port went down. Exit.
             logmsg("Fatal error in sensor communication [%s]",
                    strerror(errno));
             keep_running = 0;
             ret = 1;
+            break;
+          } else {
+            close_sensor(ps);
+            logmsg("Error in sensor %s communication [%s]",
+                   sensor_url[ps], strerror(errno));
             break;
           }
         }
