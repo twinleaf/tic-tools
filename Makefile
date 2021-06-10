@@ -38,7 +38,7 @@ obj/tio-firmware-upgrade.o: src/tio-firmware-upgrade.c $(LIB_HEADERS) | obj
 obj/tio-sensor-tree.o: src/tio-sensor-tree.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
-obj/tio-data-stream-dump.o: src/tio-data-stream-dump.c $(LIB_HEADERS) | obj
+obj/tio-dataview.o: src/tio-dataview.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
 
 obj/tio-logparse.o: src/tio-logparse.cpp $(LIB_HEADERS) | obj
@@ -62,7 +62,7 @@ bin/tio-firmware-upgrade: obj/tio-firmware-upgrade.o $(LIB_FILE) | bin
 bin/tio-sensor-tree: obj/tio-sensor-tree.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
-bin/tio-data-stream-dump: obj/tio-data-stream-dump.o $(LIB_FILE) | bin
+bin/tio-dataview: obj/tio-dataview.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
 
 bin/tio-logparse: obj/tio-logparse.o $(LIB_FILE) | bin
@@ -76,7 +76,7 @@ all: bin/tio-proxy \
      bin/tio-firmware-upgrade \
      bin/tio-udp-proxy \
      bin/tio-sensor-tree \
-     bin/tio-data-stream-dump \
+     bin/tio-dataview \
      bin/tio-logparse \
      bin/tio-record
 
@@ -92,7 +92,7 @@ install: all
 	@cp -p bin/tio-firmware-upgrade $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-record $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-logparse $(DESTDIR)$(BINDIR)/
+	@cp -p bin/tio-dataview $(DESTDIR)$(BINDIR)/
 #@cp -p bin/tio-udp-proxy $(DESTDIR)$(BINDIR)/
 #@cp -p bin/tio-sensor-tree $(DESTDIR)$(BINDIR)/
-#@cp -p bin/tio-data-stream-dump $(DESTDIR)$(BINDIR)/
 
