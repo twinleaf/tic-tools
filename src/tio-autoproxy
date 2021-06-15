@@ -26,7 +26,7 @@ devs=($devs)
 if [ "${#devs[@]}" -ne "1" ]; then
     multi="-h"
 fi
-cmd="${0//autoproxy.sh/proxy} ${multi} ${@} ${devs[@]}"
+cmd="${0//autoproxy/proxy} ${multi} ${@} ${devs[@]}"
 cmd=($cmd)
 cmd="${cmd[@]}"
 echo "Running: $cmd"
