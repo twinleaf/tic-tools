@@ -74,8 +74,12 @@ bin/tio-record: obj/tio-record.o $(LIB_FILE) | bin
 bin/tio-autoproxy: src/tio-autoproxy | bin
 	@install $< $@
 
+bin/tio-autoproxy-noftdi: src/tio-autoproxy | bin
+	@install $< $@
+
 all: bin/tio-proxy \
      bin/tio-autoproxy \
+     bin/tio-autoproxy-noftdi \
      bin/tio-rpc \
      bin/tio-firmware-upgrade \
      bin/tio-udp-proxy \
@@ -93,6 +97,7 @@ BINDIR ?= $(PREFIX)/bin
 install: all
 	@cp -p bin/tio-proxy $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-autoproxy $(DESTDIR)$(BINDIR)/
+	@cp -p bin/tio-autoproxy-noftdi $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-rpc $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-firmware-upgrade $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-record $(DESTDIR)$(BINDIR)/

@@ -1,4 +1,4 @@
-// Copyright: 2016-2017 Twinleaf LLC
+// Copyright: 2016-2021 Twinleaf LLC
 // Author: gilberto@tersatech.com
 // License: MIT
 
@@ -91,8 +91,17 @@ void print_source(tl_source_info *psi, const char *name, const char *route)
    case TL_DATA_TYPE_UINT8:
     type = "uint8";
     break;
+   case TL_DATA_TYPE_UINT16:
+    type = "uint16";
+    break;
    case TL_DATA_TYPE_UINT32:
     type = "uint32";
+    break;
+   case TL_DATA_TYPE_INT8:
+    type = "int8";
+    break;
+   case TL_DATA_TYPE_INT16:
+    type = "int16";
     break;
    case TL_DATA_TYPE_INT32:
     type = "int32";
@@ -166,6 +175,17 @@ int main(int argc, char *argv[])
     } else if (opt == 'i') {
       initial_refresh = 1;
     } else {
+      fprintf(stderr, "Usage: %s [-r root_url] [-s sensor_path] "
+              "[-c] [-l] [-u] [-i] [-x]\n", argv[0]);
+      fprintf(stderr,
+              "  -r root_url        Root URL, defaults to tcp://localhost.\n"
+              "  -s sensor_path     Sensor path relative to the root\n"
+              "  -c                 Canonical data hexdump formatting.\n"
+              "  -l                 List data sources and exit.\n"
+              "  -u                 Show only metadata updates, not data.\n"
+              "  -i                 Trigger initial send of metadata.\n"
+              "  -x                 Skip printing data for stream 0.\n"
+        );
       return 1;
     }
   }
@@ -183,7 +203,6 @@ int main(int argc, char *argv[])
     tl_rpc_reply_packet rep;
     if (tl_simple_rpc(fd, "data.source.list", 0, NULL, 0, &rep,
                       NULL, 0, NULL) != 0) {
-      printf("HERE.0\n");
       return 1;
     }
     uint16_t n = *(uint16_t*) rep.payload;

@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # Copyright: 2021 Twinleaf LLC
-# License: Proprietary
+# License: MIT
 
 os=$(uname)
 devs=""
 multi=""
-
+run_name=$(basename "$0")
 
 if [ "${os}" == "Darwin" ]; then
     devs=$(ioreg -k kUSBVendorString -p IOUSB | tr -d '|"' |
 	       grep -e '^ *\(kUSBVendorString\|USB Serial Number\)' |
 	       awk '($1 == "USB"){serial = $5}\
 		    ($3 == "Twinleaf"){print "/dev/cu.usbmodem"serial"1"}')
+    if [ "${run_name}" == "tio-autoproxy" ]; then
+        devs+=$(find /dev -name 'cu.usbserial*' 2>/dev/null)
+    fi
 elif [ "${os}" == "Linux" ]; then
     devs=$(for devfile in $(find /dev -name 'ttyACM*'); do
                (eval "$(udevadm info -q property --export -p \
@@ -20,10 +23,17 @@ elif [ "${os}" == "Linux" ]; then
                     echo "${devfile}"
                 fi)
            done)
+    if [ "${run_name}" == "tio-autoproxy" ]; then
+        devs+=$(find /dev -name 'ttyUSB*' 2>/dev/null)
+    fi
 fi
 
 devs=($devs)
-if [ "${#devs[@]}" -ne "1" ]; then
+if [ "${#devs[@]}" -eq "0" ]; then
+    echo "No sensors found."
+    exit 0
+fi
+if [ "${#devs[@]}" -gt "1" ]; then
     multi="-h"
 fi
 cmd="${0//autoproxy/proxy} ${multi} ${@} ${devs[@]}"
