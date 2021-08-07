@@ -87,6 +87,7 @@ clean:
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 install: all
+	@mkdir -p $(DESTDIR)$(BINDIR)
 	@cp -p bin/tio-proxy $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-rpc $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-firmware-upgrade $(DESTDIR)$(BINDIR)/
