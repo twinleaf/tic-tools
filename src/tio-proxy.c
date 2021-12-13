@@ -110,6 +110,7 @@ rpc_remap timeout_list; // circular list of timeouts
 
 int verbose = 0;
 const char *timefmt = "%F %T";
+int timestamp_us = 0;
 
 int usage(FILE *out, const char *program, const char *error)
 {
@@ -130,6 +131,7 @@ int usage(FILE *out, const char *program, const char *error)
   fprintf(out, "  -4        force IPv4 server only\n");
   fprintf(out, "  -t fmt    timestamp format (default \"%%F %%T\", "
           "see man strftime)\n");
+  fprintf(out, "  -u        append microseconds to timestamp\n");
   fprintf(out, "  -T sec    seconds to auto-reconnect a sensor before "
           "exiting (default 60)\n");
   return EX_USAGE;
@@ -153,13 +155,17 @@ int error(const char *fmt, ...)
 // Log a message to terminal, prefixed with a timestamp
 void logmsg(const char *fmt, ...)
 {
-  time_t now = time(NULL);
+  struct timespec now;
+  clock_gettime(CLOCK_REALTIME, &now);
   struct tm tm;
-  localtime_r(&now, &tm);
+  localtime_r(&now.tv_sec, &tm);
   char timebuf[128];
   if (strftime(timebuf, sizeof(timebuf), timefmt, &tm) == 0)
     timebuf[0] = '\0';
-  printf("%s  ", timebuf);
+  if (timestamp_us)
+    printf("%s.%06d  ", timebuf, (int)(now.tv_nsec/1000));
+  else
+    printf("%s  ", timebuf);
   va_list ap;
   va_start(ap, fmt);
   vprintf(fmt, ap);
@@ -666,7 +672,7 @@ int main(int argc, char *argv[])
   memset(&ai, 0, sizeof(ai));
   ai.ai_family = AF_UNSPEC;
 
-  for (int opt = -1; (opt = getopt(argc, argv, "fhv4p:c:r:i:t:T:")) != -1; ) {
+  for (int opt = -1; (opt = getopt(argc, argv, "fhv4up:c:r:i:t:T:")) != -1; ) {
     if (opt == 'f') {
       client_mode = CLIENT_MODE_FORWARD;
     } else if (opt == 'h') {
@@ -690,6 +696,8 @@ int main(int argc, char *argv[])
       ai.ai_family = AF_INET;
     } else if (opt == 't') {
       timefmt = optarg;
+    } else if (opt == 'u') {
+      timestamp_us = 1;
     } else if (opt == 'T') {
       sensor_reconnect_timeout = atoi(optarg);
     } else {
