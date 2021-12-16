@@ -181,17 +181,17 @@ std::string bin2string(uint8_t **pdataptr, uint8_t tio_type)
     memcpy(buf, dataptr, size);
     memset(buf+size, 0, sizeof(buf)-size);
     if (tio_type & 1) {
-      // unsigned
-      uint64_t val;
-      memcpy(&val, buf, sizeof(val));
-      snprintf(fmtbuf, sizeof(fmtbuf), "%" PRIu64, val);
-    } else {
       // signed
       int64_t val;
       memcpy(&val, buf, sizeof(val));
       // sign extend
       val = (val << ((sizeof(buf)-size)*8)) >> ((sizeof(buf)-size)*8);
       snprintf(fmtbuf, sizeof(fmtbuf), "%" PRId64, val);
+    } else {
+      // unsigned
+      uint64_t val;
+      memcpy(&val, buf, sizeof(val));
+      snprintf(fmtbuf, sizeof(fmtbuf), "%" PRIu64, val);
     }
   }
   return std::string(fmtbuf);
@@ -229,16 +229,33 @@ void tio_row_merger::write_next_row()
   fprintf(fp, "%s\n", tabjoin(row).c_str());
 }
 
+void usage(const char *bin)
+{
+  fprintf(stderr, "\n    Usage: %s <path to .tio file>\n\n", bin);
+  fprintf(stderr,
+          "  This program will generate one TSV file for each timebase\n"
+          "  present in the original data. For 'abcd.tio' with a local\n"
+          "  and an absolute timebase, it will create:\n"
+          "      - abcd.unix.tsv (data with absolute time)\n"
+          "      - abcd.1.tsv (data with local time)\n\n");
+}
+
 int main(int argc, char *argv[])
 {
-  if (argc != 2)
+  if (argc != 2) {
+    usage(argv[0]);
     return 1;
+  }
 
   int fd = -1;
   {
     std::string url = "file://";
     url += argv[1];
     fd = tlopen(url.c_str(), 0, NULL);
+    if (fd < 0) {
+      fprintf(stderr, "Failed to open %s\n", argv[1]);
+      return 1;
+    }
   }
 
   // read in fixed number of data packets and store the raw metadata
