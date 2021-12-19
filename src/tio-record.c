@@ -62,7 +62,12 @@ int main(int argc, char *argv[])
           (pkt.hdr.type != TL_PTYPE_STREAM))
         continue;
     }
-    write(output_fd, &pkt, tl_packet_total_size(&pkt.hdr));
+    ssize_t ret = write(output_fd, &pkt, tl_packet_total_size(&pkt.hdr));
+    if (ret < (ssize_t)tl_packet_total_size(&pkt.hdr)) {
+      fprintf(stderr, "Short write to output file, terminating: %s\n",
+              strerror(errno));
+      break;
+    }
   }
 
   close(output_fd);

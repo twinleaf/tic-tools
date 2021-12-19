@@ -4,9 +4,38 @@
 
 LIBTIO ?= ./libtio
 
-CCFLAGS = -g -Wall -Wextra -I$(LIBTIO)/include/ -std=gnu11
-CXXFLAGS = -g -Wall -Wextra -I$(LIBTIO)/include/ -std=gnu++17
+USE_WEBSOCKETS ?= 1
+DEBUG ?= 0
+
+CCFLAGS = -O2 -Wall -Wextra -I$(LIBTIO)/include/ -std=gnu11
+CXXFLAGS = -O2 -Wall -Wextra -I$(LIBTIO)/include/ -std=gnu++17
 LDFLAGS = -L$(LIBTIO)/lib/ -ltio
+
+WEBSOCK_PP=
+WEBSOCK_LINK=
+
+ifeq ($(DEBUG), 0)
+LDFLAGS += -Wl,-s
+else
+CCFLAGS += -g
+CXXFLAGS += -g
+endif
+
+ifeq ($(USE_WEBSOCKETS), 1)
+WEBSOCK_PP+= -DWEBSOCKETS=1
+WEBSOCK_LINK+= -lcrypto
+
+ifneq (,$(wildcard /usr/local/opt/openssl))
+WEBSOCK_PP+= -I/usr/local/opt/openssl/include
+WEBSOCK_LINK+= -L/usr/local/opt/openssl/lib
+endif
+
+ifneq (,$(wildcard /opt/homebrew/opt/openssl))
+WEBSOCK_PP+= -I/opt/homebrew/opt/openssl/include
+WEBSOCK_LINK+= -L/opt/homebrew/opt/openssl/lib
+endif
+
+endif
 
 .DEFAULT_GOAL = all
 .SECONDARY:
@@ -24,7 +53,7 @@ obj bin:
 	@mkdir -p $@
 
 obj/tio-proxy.o: src/tio-proxy.c $(LIB_HEADERS) | obj
-	@$(CC) $(CCFLAGS) -c $< -o $@
+	@$(CC) $(CCFLAGS) $(WEBSOCK_PP) -c $< -o $@
 
 obj/tio-udp-proxy.o: src/tio-udp-proxy.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
@@ -44,11 +73,11 @@ obj/tio-dataview.o: src/tio-dataview.c $(LIB_HEADERS) | obj
 obj/tio-logparse.o: src/tio-logparse.cpp $(LIB_HEADERS) | obj
 	@$(CXX) $(CXXFLAGS) -c $< -o $@
 
-bin/tio-proxy: obj/tio-proxy.o $(LIB_FILE) | bin
-	@$(CC) -o $@ $< $(LDFLAGS)
-
 obj/tio-record.o: src/tio-record.c $(LIB_HEADERS) | obj
 	@$(CC) $(CCFLAGS) -c $< -o $@
+
+bin/tio-proxy: obj/tio-proxy.o $(LIB_FILE) | bin
+	@$(CC) -o $@ $< $(LDFLAGS) $(WEBSOCK_LINK)
 
 bin/tio-udp-proxy: obj/tio-udp-proxy.o $(LIB_FILE) | bin
 	@$(CC) -o $@ $< $(LDFLAGS)
@@ -104,6 +133,5 @@ install: all
 	@cp -p bin/tio-record $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-logparse $(DESTDIR)$(BINDIR)/
 	@cp -p bin/tio-dataview $(DESTDIR)$(BINDIR)/
-#@cp -p bin/tio-udp-proxy $(DESTDIR)$(BINDIR)/
-#@cp -p bin/tio-sensor-tree $(DESTDIR)$(BINDIR)/
-
+#	@cp -p bin/tio-udp-proxy $(DESTDIR)$(BINDIR)/
+#	@cp -p bin/tio-sensor-tree $(DESTDIR)$(BINDIR)/

@@ -21,8 +21,17 @@
 #include <poll.h>
 #include <sysexits.h>
 
-#define MAX_CLIENTS_DEFAULT 16
-#define MAX_RPCS_DEFAULT 16
+#ifndef WEBSOCKETS
+#define WEBSOCKETS 0
+#endif
+
+#if WEBSOCKETS
+#include <openssl/sha.h>
+#include <openssl/evp.h>
+#endif
+
+#define MAX_CLIENTS_DEFAULT 64
+#define MAX_RPCS_DEFAULT 64
 
 #if defined (__linux__)
 // For some reason, at least on some linux systems there is no declaration
@@ -87,6 +96,13 @@ int sensor_reconnect_timeout = 60;
 struct timespec last_reconnect_attempt;
 
 struct pollfd *poll_array = NULL;
+uint32_t *descriptor_flags = NULL;
+#define WEBSOCKET_PORT         1 // server flag: websocket port
+#define WEBSOCKET_HANDSHAKE    1 // client flag: handshake hasn't happened yet
+
+#if WEBSOCKETS
+const char *websock_port = EXPAND_AND_QUOTE(TL_WS_DEFAULT_PORT);
+#endif
 
 int disconnected_clients_flag = 0;
 
@@ -120,6 +136,7 @@ int usage(FILE *out, const char *program, const char *error)
           "[-h [-i hub_id]] [-t timefmt] sensor_url [sensor_url ...]\n",
           program);
   fprintf(out, "  -p port   TCP listen port. default 7855\n");
+  fprintf(out, "  -w port   WebSocket listen port. default 7853\n");
   fprintf(out, "  -f        client forward mode\n");
   fprintf(out, "  -c max    max simultaneous clients in shared mode, "
           "default %d\n", MAX_CLIENTS_DEFAULT);
@@ -606,6 +623,78 @@ int handle_tlio(size_t ps)
   return SUCCESS;
 }
 
+#if WEBSOCKETS
+int handle_websock(size_t ps)
+{
+  errno = 0;
+  if (poll_array[ps].revents & POLLERR)
+    return ERROR_LOCAL;
+
+  // HACK: Right now assume the request comes in a single packet, or fast
+  // enough that we can read it all in one go.
+  char buf[2048+1];
+  int ret = read(poll_array[ps].fd, buf, sizeof(buf)-1);
+  if (ret <= 0)
+    return ERROR_LOCAL;
+
+  buf[ret] = '\0';
+  const char *key = NULL;
+  int status = 0;
+  const char *line = buf;
+
+  for (;;) {
+    char *end = strstr(line, "\r\n");
+    if (!end) {
+      status = -1;
+      break;
+    }
+    *end = '\0';
+    if ((end-line) == 0)
+      break;
+    if (strcmp(line, "Upgrade: websocket") == 0)
+      status = 1;
+    if (strncmp(line, "Sec-WebSocket-Key:", 18) == 0)
+      key = line + 19;
+    line = end + 2;
+  }
+
+  if ((status != 1) || !key) {
+    close(poll_array[ps].fd);
+    return ERROR_LOCAL;
+  }
+
+  SHA_CTX shactx;
+  unsigned char sha_hash[SHA_DIGEST_LENGTH];
+  SHA1_Init(&shactx);
+  SHA1_Update(&shactx, key, strlen(key));
+  SHA1_Update(&shactx, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", 36);
+  SHA1_Final(sha_hash, &shactx);
+
+  unsigned char hash64[(sizeof(sha_hash)+2)/3*4+1];
+  EVP_EncodeBlock(hash64, sha_hash, sizeof(sha_hash));
+
+  buf[0] = 0;
+  strncat(buf,
+          "HTTP/1.1 101 Switching Protocols\r\n"
+          "Upgrade: websocket\r\n"
+          "Connection: Upgrade\r\n"
+          "Sec-WebSocket-Accept: ",
+          sizeof(buf));
+  strncat(buf, (char*) hash64, sizeof(buf));
+  strncat(buf, "\r\n\r\n", sizeof(buf));
+  if (write(poll_array[ps].fd, buf, strlen(buf)) != (ssize_t) strlen(buf)) {
+    close(poll_array[ps].fd);
+    return ERROR_LOCAL;
+  }
+
+  tlfdopen(poll_array[ps].fd, "ws", NULL, &io_log);
+
+  descriptor_flags[ps] &= ~WEBSOCKET_HANDSHAKE;
+
+  return SUCCESS;
+}
+#endif
+
 // Client waiting to connect on server socket. Return error if there are
 // errors with listening sockets, but not if there are errors with
 // new clients.
@@ -638,30 +727,52 @@ int client_connection(size_t ps)
       continue;
     }
 
-    int tlfd = tlfdopen(client_fd, "tcp", NULL, &io_log);
-    if (tlfd < 0) {
-      logmsg("Failed to open new client (%s:%s) in libtio: %s",
-             host, port, strerror(errno));
-      close(client_fd);
-      continue;
-    }
-
     // Make sure we have enough space for this client
     if (n_descriptors >= max_descriptors) {
       logmsg("Accepting client (%s:%s) will exceed maximum number of clients",
              host, port);
-      tlclose(tlfd);
+      close(client_fd);
       continue;
+    }
+
+    int tlfd = client_fd;
+    if (!(descriptor_flags[ps] & WEBSOCKET_PORT)) {
+      tlfd = tlfdopen(client_fd, "tcp", NULL, &io_log);
+      if (tlfd < 0) {
+        logmsg("Failed to open new client (%s:%s) in libtio: %s",
+               host, port, strerror(errno));
+        close(client_fd);
+        continue;
+      }
     }
 
     poll_array[n_descriptors].fd = tlfd;
     poll_array[n_descriptors].events = POLLIN;
+    descriptor_flags[n_descriptors] = 0;
     if (client_list)
       init_remap_struct(&client_list[n_descriptors], NULL, NULL);
+    if (descriptor_flags[ps] & WEBSOCKET_PORT)
+      descriptor_flags[n_descriptors] |= WEBSOCKET_HANDSHAKE;
     n_descriptors++;
 
     logmsgverbose("Accepted client #%d: %s:%s", tlfd, host, port);
   }
+}
+
+int setup_listening_sock(struct addrinfo *i)
+{
+  int sock = socket(i->ai_family, i->ai_socktype, i->ai_protocol);
+  if (sock < 0)
+    return error("Failed to open listening socket");
+  int on = 1;
+  setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));
+  bind(sock, i->ai_addr, i->ai_addrlen);
+  listen(sock, 32);
+  if (set_nonblock_cloexec(sock) != 0)
+    return error("Failed to set listening socket flags");
+  poll_array[n_descriptors].fd = sock;
+  poll_array[n_descriptors].events = POLLIN;
+  return 0;
 }
 
 int main(int argc, char *argv[])
@@ -672,13 +783,18 @@ int main(int argc, char *argv[])
   memset(&ai, 0, sizeof(ai));
   ai.ai_family = AF_UNSPEC;
 
-  for (int opt = -1; (opt = getopt(argc, argv, "fhv4up:c:r:i:t:T:")) != -1; ) {
+  for (int opt = -1; (opt = getopt(argc, argv,
+                                   "fhv4up:w:c:r:i:t:T:")) != -1; ) {
     if (opt == 'f') {
       client_mode = CLIENT_MODE_FORWARD;
     } else if (opt == 'h') {
       sensor_mode = SENSOR_MODE_HUB;
     } else if (opt == 'p') {
       service_port = optarg;
+#if WEBSOCKETS
+    } else if (opt == 'w') {
+      websock_port = optarg;
+#endif
     } else if (opt == 'c') {
       max_clients = strtoul(optarg, NULL, 0);
       if (max_clients == 0)
@@ -732,7 +848,7 @@ int main(int argc, char *argv[])
     snprintf(hub_id, sizeof(hub_id), "%s.%d", host, getpid());
   }
 
-  // Initialize the service sockets (there are usually two, for IPv4 and IPv6
+  // Initialize the service sockets (there are usually two, for IPv4 and IPv6)
   ai.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
   ai.ai_socktype = SOCK_STREAM;
   ai.ai_protocol = IPPROTO_TCP;
@@ -740,9 +856,18 @@ int main(int argc, char *argv[])
   if (getaddrinfo(NULL, service_port, &ai, &result) != 0)
     return error("Failed to get listening address info");
 
-  n_listen = 0;
   for (struct addrinfo *i = result; i; i = i->ai_next)
     n_listen++;
+
+#if WEBSOCKETS
+  struct addrinfo ai_ws = ai;
+  struct addrinfo *result_ws;
+  if (getaddrinfo(NULL, websock_port, &ai_ws, &result_ws) != 0)
+    return error("Failed to get websocket listening address info");
+
+  for (struct addrinfo *i = result_ws; i; i = i->ai_next)
+    n_listen++;
+#endif
 
   if (n_listen == 0)
     return error("No listening sockets configurations available");
@@ -751,6 +876,9 @@ int main(int argc, char *argv[])
   poll_array = calloc(max_descriptors, sizeof(struct pollfd));
   if (!poll_array)
     return error("Failed to allocate poll array");
+  descriptor_flags = calloc(max_descriptors, sizeof(*descriptor_flags));
+  if (!descriptor_flags)
+    return error("Failed to allocate descriptor flags");
 
   // Connect to all sensors
   for (n_descriptors = 0; n_descriptors < n_sensors; n_descriptors++) {
@@ -763,20 +891,20 @@ int main(int argc, char *argv[])
 
   // Set up listening sockets
   for (struct addrinfo *i = result; i; i = i->ai_next, n_descriptors++) {
-    int sock = socket(i->ai_family, i->ai_socktype, i->ai_protocol);
-    if (sock < 0)
-      return error("Failed to open listening socket");
-    int on = 1;
-    setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));
-    bind(sock, i->ai_addr, i->ai_addrlen);
-    listen(sock, 32);
-    if (set_nonblock_cloexec(sock) != 0)
-      return error("Failed to set listening socket flags");
-    poll_array[n_descriptors].fd = sock;
-    poll_array[n_descriptors].events = POLLIN;
+    int ret = setup_listening_sock(i);
+    if (ret) return ret;
   }
-
   freeaddrinfo(result);
+
+#if WEBSOCKETS
+  for (struct addrinfo *i = result_ws; i; i = i->ai_next, n_descriptors++) {
+    int ret = setup_listening_sock(i);
+    if (ret) return ret;
+    descriptor_flags[n_descriptors] = WEBSOCKET_PORT;
+  }
+  freeaddrinfo(result_ws);
+#endif
+
 
   if (client_mode == CLIENT_MODE_SHARED)
     init_rpc_remap();
@@ -816,6 +944,7 @@ int main(int argc, char *argv[])
         if (poll_array[i].fd >= 0) {
           if (i != n_descriptors) {
             poll_array[n_descriptors] = poll_array[i];
+            descriptor_flags[n_descriptors] = descriptor_flags[i];
             if (client_list) {
               client_list[n_descriptors] = client_list[i];
               rpc_remap *r = client_list[n_descriptors].next;
@@ -957,7 +1086,17 @@ int main(int argc, char *argv[])
         // event in this same poll iteration. If something goes wrong,
         // simply close the client unless it's a critical error
         if (poll_array[ps].fd >= 0) {
-          int ret = handle_tlio(ps);
+          int ret;
+          if (descriptor_flags[ps] & WEBSOCKET_HANDSHAKE) {
+#if WEBSOCKETS
+            ret = handle_websock(ps);
+#else
+            ret = ERROR_LOCAL;
+#endif
+          } else {
+            ret = handle_tlio(ps);
+          }
+
           if (ret == ERROR_CRITICAL) {
             keep_running = 0;
             ret = 1;
