@@ -15,7 +15,7 @@ WEBSOCK_PP=
 WEBSOCK_LINK=
 
 ifeq ($(DEBUG), 0)
-LDFLAGS += -Wl,-s
+LDFLAGS += -Wl #,-s
 else
 CCFLAGS += -g
 CXXFLAGS += -g
