@@ -673,15 +673,13 @@ int handle_websock(size_t ps)
   unsigned char hash64[(sizeof(sha_hash)+2)/3*4+1];
   EVP_EncodeBlock(hash64, sha_hash, sizeof(sha_hash));
 
-  buf[0] = 0;
-  strncat(buf,
-          "HTTP/1.1 101 Switching Protocols\r\n"
-          "Upgrade: websocket\r\n"
-          "Connection: Upgrade\r\n"
-          "Sec-WebSocket-Accept: ",
-          sizeof(buf));
-  strncat(buf, (char*) hash64, sizeof(buf));
-  strncat(buf, "\r\n\r\n", sizeof(buf));
+  snprintf(buf, sizeof(buf),
+           "HTTP/1.1 101 Switching Protocols\r\n"
+           "Upgrade: websocket\r\n"
+           "Connection: Upgrade\r\n"
+           "Sec-WebSocket-Accept: %s\r\n\r\n",
+           hash64);
+
   if (write(poll_array[ps].fd, buf, strlen(buf)) != (ssize_t) strlen(buf)) {
     close(poll_array[ps].fd);
     return ERROR_LOCAL;
