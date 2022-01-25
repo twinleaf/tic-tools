@@ -146,8 +146,10 @@ void print_stream(tl_stream_info *dsi, tl_stream_component_info *dci,
 
 void print_heartbeat(tl_packet *pkt, const char *route)
 {
-  printf("%s/heartbeat: %.*s%s\n", route, pkt->hdr.payload_size, pkt->payload,
-         pkt->hdr.payload_size ? "" : "[empty]");
+  char session_id[9] = "[empty]";
+  if (pkt->hdr.payload_size == 4)
+    snprintf(session_id, sizeof(session_id), "%08X", *(uint32_t*)pkt->payload);
+  printf("%s/heartbeat: %s\n", route, session_id);
 }
 
 int main(int argc, char *argv[])
@@ -182,7 +184,7 @@ int main(int argc, char *argv[])
               "  -s sensor_path     Sensor path relative to the root\n"
               "  -c                 Canonical data hexdump formatting.\n"
               "  -l                 List data sources and exit.\n"
-              "  -u                 Show only metadata updates, not data.\n"
+              "  -u                 Show only metadata updates.\n"
               "  -i                 Trigger initial send of metadata.\n"
               "  -x                 Skip printing data for stream 0.\n"
         );
@@ -248,7 +250,7 @@ int main(int argc, char *argv[])
     } else if (pkt.hdr.type == TL_PTYPE_STREAM) {
       tl_stream_update_packet *dsu = (tl_stream_update_packet*) &pkt;
       print_stream(&dsu->info, dsu->component, route_str);
-    } else if (pkt.hdr.type == TL_PTYPE_HEARTBEAT) {
+    } else if (!updates_only && (pkt.hdr.type == TL_PTYPE_HEARTBEAT)) {
       print_heartbeat(&pkt, route_str);
     }
   }
