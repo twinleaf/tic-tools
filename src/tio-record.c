@@ -13,7 +13,7 @@
 
 void usage(const char *name)
 {
-  fprintf(stderr, "Usage: %s [-r root_sensor_url] [output_file]\n", name);
+  fprintf(stderr, "Usage: %s [-r root_sensor_url] [-v] [output_file]\n", name);
   exit(1);
 }
 
@@ -21,10 +21,13 @@ int main(int argc, char *argv[])
 {
   const char *root_url = "tcp://localhost";
   const char *output_file = NULL;
+  int verbose = 0;
 
-  for (int opt = -1; (opt = getopt(argc, argv, "r:")) != -1; ) {
+  for (int opt = -1; (opt = getopt(argc, argv, "r:v")) != -1; ) {
     if (opt == 'r') {
       root_url = optarg;
+    } else if (opt == 'v') {
+      verbose = 1;
     } else {
       usage(argv[0]);
     }
@@ -51,6 +54,8 @@ int main(int argc, char *argv[])
     }
   }
 
+  size_t n_recorded = 0;
+
   for (;;) {
     tl_packet pkt;
     if (tlrecv(fd, &pkt, sizeof(pkt)) != 0)
@@ -67,6 +72,12 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Short write to output file, terminating: %s\n",
               strerror(errno));
       break;
+    }
+    if (verbose) {
+      n_recorded++;
+      printf("\r%c %zd packets recorded",
+             "-\\|/-\\|/"[n_recorded % 8], n_recorded);
+      fflush(stdout);
     }
   }
 
