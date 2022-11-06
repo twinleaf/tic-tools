@@ -34,7 +34,7 @@ This set of commands changed decimation to 10 points, turned off the automatic a
 
 [libtio](https://github.com/twinleaf/libtio) is an included submodule. Be sure to run `git submodule update --init` after cloning this repository. The tools compile and run on standard POSIX systems. To get a build environment use:
 
-  - Linux and WSL (Ubuntu): `apt install build-essential openssl-dev`
+  - Linux and WSL (Ubuntu): `apt install build-essential libssl-dev`
   - macOS: build tools; `xcode-select --install`
   - macOS: openssl library; `brew install openssl`
   - WSL: WSL 2 does not support serial ports, so downgrade to 1 using `PS> wsl --set-version Ubuntu-20.04 1`
