@@ -344,7 +344,7 @@ int main(int argc, char *argv[])
       } else {
         char fmtbuf[32];
         for (size_t i = 0; i < sizeof(tbit->second.source_id); i++) {
-          sprintf(fmtbuf, "%02X", tbit->second.source_id[i]);
+          snprintf(fmtbuf, sizeof(fmtbuf), "%02X", tbit->second.source_id[i]);
           tbid += fmtbuf;
         }
       }

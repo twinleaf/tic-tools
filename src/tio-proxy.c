@@ -445,7 +445,7 @@ int sensor_data(size_t ps, tl_packet *packet)
       return SUCCESS;
     }
 
-    uint8_t *routing = tl_packet_routing_data(&packet->hdr);
+    uint8_t *routing = tl_packet_routing_data(packet);
     routing[routing_size++] = ps;
     tl_packet_set_routing_size(&packet->hdr, routing_size);
   }
@@ -663,12 +663,23 @@ int handle_websock(size_t ps)
     return ERROR_LOCAL;
   }
 
-  SHA_CTX shactx;
+  EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
   unsigned char sha_hash[SHA_DIGEST_LENGTH];
-  SHA1_Init(&shactx);
-  SHA1_Update(&shactx, key, strlen(key));
-  SHA1_Update(&shactx, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", 36);
-  SHA1_Final(sha_hash, &shactx);
+  if (!mdctx) {
+    close(poll_array[ps].fd);
+    return ERROR_LOCAL;
+  }
+
+  int success =
+    EVP_DigestInit_ex(mdctx, EVP_sha1(), NULL) &&
+    EVP_DigestUpdate(mdctx, key, strlen(key)) &&
+    EVP_DigestUpdate(mdctx, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", 36) &&
+    EVP_DigestFinal_ex(mdctx, sha_hash, NULL);
+  EVP_MD_CTX_free(mdctx);
+  if (!success) {
+    close(poll_array[ps].fd);
+    return ERROR_LOCAL;
+  }
 
   unsigned char hash64[(sizeof(sha_hash)+2)/3*4+1];
   EVP_EncodeBlock(hash64, sha_hash, sizeof(sha_hash));
