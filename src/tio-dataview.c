@@ -15,8 +15,15 @@ int single_line = 1;
 void print_data(tl_data_stream_packet *dsp, int stream_id, const char *route)
 {
   size_t data_len = dsp->hdr.payload_size - sizeof(uint32_t);
-  printf("%s/stream%d sample %u, %zd bytes:", route, stream_id,
-         dsp->start_sample, data_len);
+  uint32_t sample_number = dsp->start_sample;
+  int segment = -1;
+  if (stream_id > 0) {
+    sample_number = dsp->sample.sample_start_0 |
+      (dsp->sample.sample_start_1 << 8) | (dsp->sample.sample_start_2 << 16);
+    segment = dsp->sample.segment_id;
+  }
+  printf("%s/stream%d sample %u (segment %d), %zd bytes:", route, stream_id,
+         sample_number, segment, data_len);
   if (single_line) {
     for (size_t i = 0; i < data_len; i++)
       printf(" %02X", dsp->data[i]);
@@ -44,6 +51,120 @@ void print_data(tl_data_stream_packet *dsp, int stream_id, const char *route)
     if (single_line || ((data_len % (3*4)) != 0))
       printf("\n");
   }
+}
+
+struct tl_varlen_helper {
+  const char *ptr;
+  const char *end;
+};
+
+void tl_varlen_init(struct tl_varlen_helper *vh,
+                    struct tl_metadata_container *meta)
+{
+  vh->ptr = (char*)&meta->payload[meta->payload[0]];
+  vh->end = (char*)&meta->payload[meta->hdr.payload_size - sizeof(meta->mhdr)];
+}
+
+const char *tl_varlen_str(struct tl_varlen_helper *vh)
+{
+  return vh->ptr;
+}
+
+int tl_varlen_advance(struct tl_varlen_helper *vh, size_t size)
+{
+  size_t max = vh->end - vh->ptr;
+  if (size > max)
+    size = max;
+  vh->ptr += size;
+  return (int) size;
+}
+
+void print_metadata(struct tl_metadata_container *meta, const char *route)
+{
+  const char *type = "UNKNOWN";
+  switch (meta->mhdr.type) {
+  case TL_METADATA_DEVICE: type = "device"; break;
+  case TL_METADATA_STREAM: type = "stream"; break;
+  case TL_METADATA_CURRENT_SEGMENT: type = "current segment"; break;
+  case TL_METADATA_COLUMN: type = "column"; break;
+  }
+  size_t size = meta->hdr.payload_size - sizeof(tl_metadata_header);
+  printf("%s/metadata %s (%zu bytes):%s%s%s\n", route, type, size,
+         (meta->mhdr.flags & TL_METADATA_PERIODIC) ? " PERIODIC" : "",
+         (meta->mhdr.flags & TL_METADATA_UPDATE) ? " UPDATE" : "",
+         (meta->mhdr.flags & TL_METADATA_LAST) ? " LAST" : "");
+
+  struct tl_varlen_helper vh;
+  const char *val;
+  tl_varlen_init(&vh, meta);
+
+  if (meta->mhdr.type == TL_METADATA_DEVICE) {
+    struct tl_metadata_device *dev =
+      (struct tl_metadata_device*) &meta->payload;
+    val = tl_varlen_str(&vh);
+    printf("  name: %.*s\n",
+           tl_varlen_advance(&vh, dev->name_varlen), val);
+    printf("  streams: %d\n", dev->n_streams);
+    printf("  session id: %d\n", dev->session_id);
+    val = tl_varlen_str(&vh);
+    printf("  serial: %.*s\n",
+           tl_varlen_advance(&vh, dev->serial_varlen), val);
+    val = tl_varlen_str(&vh);
+    printf("  firmware: %.*s\n",
+           tl_varlen_advance(&vh, dev->firmware_varlen), val);
+  } else if (meta->mhdr.type == TL_METADATA_STREAM) {
+    struct tl_metadata_stream *stream =
+      (struct tl_metadata_stream*) &meta->payload;
+    printf("  stream id: %d\n", stream->stream_id);
+    val = tl_varlen_str(&vh);
+    printf("  name: %.*s\n",
+           tl_varlen_advance(&vh, stream->name_varlen), val);
+    printf("  columns: %d\n", stream->n_columns);
+    printf("  segments: %d\n", stream->n_segments);
+    printf("  sample size: %d\n", stream->sample_size);
+    printf("  buffered samples: %d\n", stream->buf_samples);
+  } else if (meta->mhdr.type == TL_METADATA_CURRENT_SEGMENT) {
+    struct tl_metadata_segment *seg =
+      (struct tl_metadata_segment*) &meta->payload;
+    printf("  stream id: %d\n", seg->stream_id);
+    printf("  current segment id: %d\n", seg->segment_id);
+    if (seg->flags & TL_METADATA_SEGMENT_FLAG_INVALID) {
+      printf("  flags: invalid\n");
+    } else {
+      printf("  time reference:\n");
+      const char *epoch_str = "INVALID";
+      switch (seg->time_ref_epoch) {
+      case TL_METADATA_EPOCH_ZERO: epoch_str = "ZERO"; break;
+      case TL_METADATA_EPOCH_SYSTIME: epoch_str = "SYSTIME"; break;
+      case TL_METADATA_EPOCH_UNIX: epoch_str = "UNIX"; break;
+      }
+      printf("    epoch: %s\n", epoch_str);
+      val = tl_varlen_str(&vh);
+      printf("    serial: %.*s\n",
+           tl_varlen_advance(&vh, seg->time_ref_serial_varlen), val);
+      printf("    session id: %d\n", seg->time_ref_session_id);
+      printf("  start time: %u\n", seg->start_time);
+      printf("  sampling rate: %u sps\n", seg->sampling_rate);
+      printf("  decimation: %u\n", seg->decimation);
+      if (seg->filter_type != TL_METADATA_FILTER_NONE) {
+        printf("  filter order: %d\n", seg->filter_type);
+        printf("  filter cutoff: %f Hz\n", seg->filter_cutoff);
+      }
+    }
+  } else if (meta->mhdr.type == TL_METADATA_COLUMN) {
+    struct tl_metadata_column *col =
+      (struct tl_metadata_column*) &meta->payload;
+    printf("  stream id: %d\n", col->stream_id);
+    printf("  column index:  %d\n", col->index);
+    val = tl_varlen_str(&vh);
+    printf("  name: %.*s\n", tl_varlen_advance(&vh, col->name_varlen), val);
+    val = tl_varlen_str(&vh);
+    printf("  units: %.*s\n", tl_varlen_advance(&vh, col->units_varlen), val);
+    val = tl_varlen_str(&vh);
+    printf("  description: %.*s\n",
+           tl_varlen_advance(&vh, col->description_varlen), val);
+  }
+
 }
 
 void print_timebase(tl_timebase_info *tbi, const char *route)
@@ -120,7 +241,7 @@ void print_source(tl_source_info *psi, const char *name, const char *route)
 }
 
 void print_stream(tl_stream_info *dsi, tl_stream_component_info *dci,
-                   const char *route)
+                  const char *route)
 {
   printf ("%s/stream%d: timebase %d period %d offset %d sample %lu\n",
           route, dsi->id, dsi->timebase_id, dsi->period, dsi->offset,
@@ -159,7 +280,7 @@ int main(int argc, char *argv[])
   int list = 0;
   int updates_only = 0;
   int initial_refresh = 0;
-  int exclude_default_stream = 0;
+  int exclude_legacy_stream = 0;
 
   for (int opt = -1; (opt = getopt(argc, argv, "r:s:cluxi")) != -1; ) {
     if (opt == 'r') {
@@ -173,7 +294,7 @@ int main(int argc, char *argv[])
     } else if (opt == 'u') {
       updates_only = 1;
     } else if (opt == 'x') {
-      exclude_default_stream = 1;
+      exclude_legacy_stream = 1;
     } else if (opt == 'i') {
       initial_refresh = 1;
     } else {
@@ -237,8 +358,11 @@ int main(int argc, char *argv[])
                       route_str, sizeof(route_str), 0);
     int id = tl_packet_stream_id(&pkt.hdr);
     if (id >= 0) {
-      if (!updates_only && (!exclude_default_stream || (id != 0)))
+      if (!updates_only && (!exclude_legacy_stream || (id != 0)))
         print_data((tl_data_stream_packet*) &pkt, id, route_str);
+    } else if (pkt.hdr.type == TL_PTYPE_METADATA) {
+      struct tl_metadata_container *mc = (struct tl_metadata_container*) &pkt;
+      print_metadata(mc, route_str);
     } else if (pkt.hdr.type == TL_PTYPE_TIMEBASE) {
       tl_timebase_update_packet *tbu = (tl_timebase_update_packet*) &pkt;
       print_timebase(&tbu->info, route_str);
